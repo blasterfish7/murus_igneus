@@ -1,0 +1,55 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+set -eu
+printf '\nInstallazione OpenWall: IL DISCO SCELTO VERRA CANCELLATO.\nUsare un disco vuoto dedicato. Lasciare collegata la ISO.\n'
+lsblk -o NAME,SIZE,TYPE,MODEL 2>/dev/null || fdisk -l
+printf '\nDisco da cancellare (es. /dev/vda): '
+read -r disk
+case "$disk" in /dev/sd[a-z]|/dev/vd[a-z]|/dev/nvme[0-9]n[0-9]) ;; *) echo 'Percorso non valido'; exit 1;; esac
+[ -b "$disk" ] || { echo 'Disco assente'; exit 1; }
+printf 'Conferma riscrivendo il disco: '
+read -r confirm
+[ "$confirm" = "$disk" ] || { echo 'Annullato'; exit 1; }
+repo=
+for candidate in /media/cdrom/apks /media/sr0/apks; do
+    if [ -f "$candidate/x86_64/APKINDEX.tar.gz" ]; then repo="$candidate"; break; fi
+done
+[ -n "$repo" ] || { echo 'Repository locale della ISO non trovato'; exit 1; }
+printf '/opt/openwall\n/usr/local/sbin/openwall-info\n/usr/local/sbin/openwall-install\n' > /etc/lbu/include
+saved="$(mktemp)"
+cp /etc/apk/repositories "$saved"
+trap 'cp "$saved" /etc/apk/repositories; rm -f "$saved"' EXIT
+printf '%s\n' "$repo" > /etc/apk/repositories
+export KERNEL_FLAVOR=virt BOOTLOADER=grub
+setup-disk -m sys -k virt "$disk"
+mkdir -p /mnt/openwall-post
+found=no
+for partition in "$disk"*; do
+    [ -b "$partition" ] || continue
+    [ "$(blkid -s TYPE -o value "$partition" 2>/dev/null || true)" = ext4 ] || continue
+    if mount "$partition" /mnt/openwall-post; then
+        if [ -f /mnt/openwall-post/etc/alpine-release ]; then
+            # lbu does not recursively preserve arbitrary application directories.
+            # Copy our independent application explicitly after the base installation.
+            mkdir -p /mnt/openwall-post/opt /mnt/openwall-post/usr/local/sbin /mnt/openwall-post/etc/runlevels/default /mnt/openwall-post/etc/udhcpc
+            cp -a /opt/openwall /mnt/openwall-post/opt/
+            cp -p /usr/local/sbin/openwall-info /usr/local/sbin/openwall-install /mnt/openwall-post/usr/local/sbin/
+            cp -a /etc/openwall /mnt/openwall-post/etc/
+            cp -p /etc/init.d/openwall /mnt/openwall-post/etc/init.d/openwall
+            cp -p /etc/network/interfaces /mnt/openwall-post/etc/network/interfaces
+            cp -p /etc/udhcpc/udhcpc.conf /mnt/openwall-post/etc/udhcpc/udhcpc.conf
+            cp -p /etc/hostname /mnt/openwall-post/etc/hostname
+            ln -sf /etc/init.d/openwall /mnt/openwall-post/etc/runlevels/default/openwall
+            root_hash="$(awk -F: '$1 == "root" {print $2}' /etc/shadow)"
+            printf 'root:%s\n' "$root_hash" | chroot /mnt/openwall-post chpasswd -e
+            printf 'https://dl-cdn.alpinelinux.org/alpine/v3.23/main\nhttps://dl-cdn.alpinelinux.org/alpine/v3.23/community\n' > /mnt/openwall-post/etc/apk/repositories
+            test -s /mnt/openwall-post/opt/openwall/server.py
+            test -s /mnt/openwall-post/etc/openwall/active.json || echo 'Nessuna migrazione confermata da conservare'
+            found=yes
+        fi
+        umount /mnt/openwall-post
+    fi
+done
+[ "$found" = yes ] || { echo 'Installazione non verificata: applicazione non trovata sul disco'; exit 1; }
+echo 'INSTALLAZIONE OPENWALL COMPLETATA'
+echo 'Spegni, scollega la ISO e avvia dal disco.'
