@@ -7,6 +7,14 @@ from configuration import compile_config
 from migration import Error
 BASE={'schema':1,'interfaces':[{'name':'WAN','device':'eth1','address':'192.0.2.2/24'},{'name':'LAN','device':'eth2','address':'198.51.100.1/24'}],'addresses':[],'groups':[],'services':[],'service_groups':[],'policies':[],'routes':[]}
 class SecurityTests(unittest.TestCase):
+ def test_disabled_features_allow_different_management_port(self):
+  self.assertTrue(compile_config({'schema':1},management='eth1')['ready'])
+ def test_peer_cannot_claim_server_address(self):
+  c=security.defaults();c['vpn']['peers']=[{'public_key':base64.b64encode(bytes(range(32))).decode(),'allowed_ips':['10.77.0.0/24']}]
+  with self.assertRaises(Error):security.validate(c,'eth0')
+ def test_peer_cannot_replace_connected_lan_route(self):
+  c=copy.deepcopy(BASE);c.update(security.defaults());c['vpn']['enabled']=True;c['vpn']['peers']=[{'public_key':base64.b64encode(bytes(range(32))).decode(),'allowed_ips':['198.51.100.0/24']}]
+  with self.assertRaises(Error):compile_config(c)
  def test_wireguard_compiles_into_firewall(self):
   c=copy.deepcopy(BASE);c.update(security.defaults());c['vpn']['enabled']=True
   c['policies']=[{'id':'1','name':'vpn-lan','srcintf':['VPN'],'dstintf':['LAN'],'srcaddr':['all'],'dstaddr':['all'],'service':['ALL'],'action':'accept','nat':False,'log':True,'enabled':True}]
@@ -33,3 +41,4 @@ class SecurityTests(unittest.TestCase):
    with self.assertRaises(Error):installer.start({'id':'ok','confirmation':'CANCELLA /dev/vda'})
  def test_installer_not_available_on_installed_system(self):
   with patch.object(installer,'live',return_value=False):self.assertFalse(installer.inventory()['live'])
+

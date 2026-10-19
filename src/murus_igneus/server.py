@@ -8,6 +8,7 @@ import os
 import re
 from pathlib import Path
 import secrets
+import signal
 import ssl
 import subprocess
 import threading
@@ -30,6 +31,14 @@ def run(args,data=None,check=True):
 
 def atomic(path,text):
     temp=path.with_suffix('.tmp');temp.write_text(text);temp.chmod(0o600);temp.replace(path)
+
+def check_vpn_management(settings):
+    v=settings['vpn']
+    if not v['enabled']:return
+    values=json.loads(run(['ip','-j','-4','addr','show','dev',MGMT]))
+    protected=[ipaddress.IPv4Interface(a['local']+'/'+str(a['prefixlen'])).network for i in values for a in i.get('addr_info',[])]
+    routes=[ipaddress.IPv4Interface(v['address']).network]+[ipaddress.IPv4Network(n) for p in v['peers'] for n in p['allowed_ips']]
+    if any(n.overlaps(m) for n in routes for m in protected):raise Error('Una rete VPN si sovrappone alla rete di gestione')
 
 def network(ops,undo):
     available={x['ifname'] for x in json.loads(run(['ip','-j','link']))}
@@ -74,12 +83,15 @@ def rollback(ident):
     with LOCK:
         if not PENDING or PENDING['id']!=ident:return
         p=PENDING
+        run(['nft','-f','-'],baseline(MGMT))
         for args in reversed(p['undo']):run(args,check=False)
+        service_error=None
         try:security.activate(p['security'])
-        except Exception as e:LAST='Ripristino servizi fallito: '+str(e)
+        except Exception as e:service_error=str(e)
         run(['nft','-f','-'],p['old']);run(['conntrack','-F'],check=False)
         run(['sysctl','-w','net.ipv4.ip_forward='+p['forward']],check=False)
         PENDING=None;LAST='Modifica annullata; ripristinata la configurazione precedente'
+        if service_error:LAST='Ripristino servizi fallito: '+service_error
 
 def apply(plan):
     global PENDING,LAST
@@ -92,11 +104,13 @@ def apply(plan):
         run(['nft','-f','-'],baseline(MGMT))
         remove_previous(ACTIVE['network_ops'] if ACTIVE else [],plan['network_ops'],PENDING['undo'])
         settings=plan.get('security',security.defaults())
+        check_vpn_management(settings)
         security.activate(settings)
         network(plan['network_ops'],PENDING['undo']);run(['nft','-f','-'],plan['nftables'])
         run(['conntrack','-F']);run(['sysctl','-w','net.ipv4.ip_forward=1'])
     except Exception:
         rollback(ident);raise
+    PENDING['deadline']=time.time()+90
     timer=threading.Timer(90,rollback,[ident]);timer.daemon=True;timer.start()
     LAST='Applicata temporaneamente: confermare entro 90 secondi';return ident
 
@@ -185,7 +199,7 @@ def main():
         try:
             plan=json.loads((STATE/'active.json').read_text())
             if not plan['ready']:raise Error('Piano salvato non valido')
-            security.activate(plan.get('security',security.defaults()))
+            settings=plan.get('security',security.defaults());check_vpn_management(settings);security.activate(settings)
             run(['nft','--check','-f','-'],plan['nftables']);network(plan['network_ops'],undo)
             run(['nft','-f','-'],plan['nftables']);run(['sysctl','-w','net.ipv4.ip_forward=1']);LAST='Configurazione salvata ripristinata';ACTIVE=plan
         except Exception as e:
@@ -194,7 +208,16 @@ def main():
     cert,key=STATE/'server.crt',STATE/'server.key'
     if not cert.exists() or not key.exists():
         run(['openssl','req','-x509','-newkey','rsa:2048','-sha256','-nodes','-days','3650','-subj','/CN=murus_igneus.local','-keyout',str(key),'-out',str(cert)]);key.chmod(0o600)
-    server=ThreadingHTTPServer(('0.0.0.0',8443),Handler);ctx=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);ctx.minimum_version=ssl.TLSVersion.TLSv1_2
+    server=ThreadingHTTPServer(('0.0.0.0',8443),Handler);server.daemon_threads=True;ctx=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);ctx.minimum_version=ssl.TLSVersion.TLSv1_2
     ctx.load_cert_chain(cert,key);server.socket=ctx.wrap_socket(server.socket,server_side=True);server.serve_forever()
 
-if __name__=='__main__':main()
+if __name__=='__main__':
+    def terminate(signum,frame):raise SystemExit(0)
+    signal.signal(signal.SIGTERM,terminate)
+    try:main()
+    finally:
+        # A service restart must not orphan the old queue listener or proxy.
+        with LOCK:
+            run(['nft','-f','-'],baseline(MGMT),check=False)
+            run(['sysctl','-w','net.ipv4.ip_forward=0'],check=False)
+            security.activate(security.defaults())

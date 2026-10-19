@@ -145,6 +145,7 @@ def compile_config(config,management='eth0'):
         tunnel=ip.IPv4Interface(settings['vpn']['address'])
         for r in base.get('interfaces',[]):
             if r.get('address') and ip.IPv4Interface(r['address']).network.overlaps(tunnel.network):raise Error('Subnet VPN sovrapposta alle reti locali')
+            if r.get('address') and any(ip.IPv4Interface(r['address']).network.overlaps(ip.IPv4Network(n)) for p in settings['vpn']['peers'] for n in p['allowed_ips']):raise Error('Rete remota VPN sovrapposta alle reti locali')
         base.setdefault('interfaces',[]).append({'name':'VPN','device':security.WG,'address':''})
     if settings['utm']['proxy']:
         port=next((r for r in base.get('interfaces',[]) if r.get('device')==settings['utm']['proxy_device']),None)
@@ -155,3 +156,4 @@ def compile_config(config,management='eth0'):
     plan['nftables']=security.decorate(plan['nftables'],settings)
     plan['version']='0.3.0-alpha'
     return plan
+

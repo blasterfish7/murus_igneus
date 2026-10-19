@@ -15,4 +15,5 @@ Only official signed Devuan `main` repositories are intended. The existing
 Alpine disk installer under `legacy/` is excluded from the package.
 
 See [the Devuan guide](../../docs/DEVUAN.md) for installation and limitations.
-An ISO builder/web disk installer and the VPN/UTM integration are still pending.
+The ISO builder is `tools/build-devuan-iso.sh`. The application includes a live web disk installer, WireGuard and optional Suricata/ClamAV HTTP proxy integration. See the guide for verification status and coverage limits.
+

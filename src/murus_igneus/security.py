@@ -43,8 +43,8 @@ def validate(config,management):
     v,u=result['vpn'],result['utm']
     for d,k in ((v,'enabled'),(u,'ips'),(u,'proxy'),(u,'enforce_http')):
         if type(d[k])!=bool:raise Error('Booleano non valido: '+k)
-    for d,k in ((v,'public_device'),(u,'proxy_device')):
-        if not isinstance(d[k],str) or not re.fullmatch(r'[A-Za-z0-9_.-]{1,15}',d[k]) or d[k] in ('lo',management,WG):raise Error('Porta dati non valida: '+k)
+    for d,k,enabled in ((v,'public_device',v['enabled']),(u,'proxy_device',u['proxy'])):
+        if not isinstance(d[k],str) or not re.fullmatch(r'[A-Za-z0-9_.-]{1,15}',d[k]) or (enabled and d[k] in ('lo',management,WG)):raise Error('Porta dati non valida: '+k)
     a=ip.IPv4Interface(v['address']);v['address']=str(a)
     if type(v['port'])!=int or not 1024<=v['port']<=65535:raise Error('Porta VPN non valida')
     if not isinstance(v['peers'],list) or len(v['peers'])>100:raise Error('Elenco peer non valido')
@@ -55,6 +55,7 @@ def validate(config,management):
         seen.add(p['public_key'])
         if not isinstance(p.get('allowed_ips'),list) or not p['allowed_ips']:raise Error('Specificare le reti remote del peer')
         current=[ip.IPv4Network(n,strict=False) for n in p['allowed_ips']]
+        if any(a.ip in n for n in current):raise Error('Una rete peer contiene l’indirizzo del server VPN')
         if any(n.prefixlen==0 or n.is_multicast or n.is_loopback for n in current):raise Error('La VPN supporta rotte specifiche, non una default route')
         if any(n.overlaps(old) for n in current for old in networks):raise Error('Reti sovrapposte tra peer')
         networks+=current;p['allowed_ips']=[str(n) for n in current]
@@ -207,3 +208,4 @@ def health():
                 if a.get('event_type')=='alert':alerts.append({'time':a.get('timestamp'),'source':a.get('src_ip'),'destination':a.get('dest_ip'),'signature':a.get('alert',{}).get('signature'),'action':a.get('alert',{}).get('action')})
             except ValueError:pass
     return {'versions':versions,'vpn':command(['wg','show',WG],check=False) if Path('/sys/class/net/'+WG).exists() else 'Disabilitata','ips_running':bool(PROCESSES.get('suricata') and PROCESSES['suricata'].poll() is None),'antivirus_ready':clam_ping(),'proxy_running':PROXY is not None,'signatures':[{'name':p.name,'bytes':p.stat().st_size,'modified':p.stat().st_mtime} for p in Path('/var/lib/clamav').glob('*') if p.suffix in ('.cvd','.cld')],'alerts':alerts,'https_scanning':False}
+

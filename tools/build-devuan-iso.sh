@@ -60,6 +60,10 @@ chmod 600 "$root/etc/murus_igneus/admin.password"
 touch "$root/etc/murus_igneus/live-image"
 printf '\nT0:2345:respawn:/sbin/agetty -L ttyS0 115200 vt100\n' >> "$root/etc/inittab"
 chroot "$root" rc-update add murus-igneus default
+# Murus owns these processes and starts them only after validated configuration.
+for service in suricata clamav-daemon clamav-freshclam; do
+    chroot "$root" update-rc.d "$service" disable
+done
 # Enable the network service at boot; package defaults are retained for other base services.
 chroot "$root" update-rc.d networking defaults
 chroot "$root" update-initramfs -u -k all
@@ -91,3 +95,4 @@ GRUB
 grub-mkrescue --compress=xz -o "$out/murus-igneus-0.3.0-alpha-devuan-amd64.iso" "$iso"
 (cd "$out" && sha256sum murus-igneus-0.3.0-alpha-devuan-amd64.iso > SHA256SUMS)
 echo 'MURUS ISO BUILD COMPLETE'
+

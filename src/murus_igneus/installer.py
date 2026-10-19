@@ -56,6 +56,7 @@ def install(disk,log):
             if Path(name).exists():
                 dest=target/name.lstrip('/');dest.mkdir(parents=True,exist_ok=True)
                 run(['rsync','-aHAX','--numeric-ids',name+'/',str(dest)+'/'])
+        run(['rsync','-a','/etc/default/murus-igneus',str(target/'etc/default/murus-igneus')])
         (target/'etc/murus_igneus/live-image').unlink(missing_ok=True)
         (target/'boot/efi').mkdir(parents=True,exist_ok=True);mount([part(2)],target/'boot/efi')
         uuid=command(['blkid','-s','UUID','-o','value',part(3)]).strip();efi=command(['blkid','-s','UUID','-o','value',part(2)]).strip()
@@ -71,3 +72,4 @@ def install(disk,log):
     finally:
         for where in reversed(mounts):
             subprocess.run(['umount','-R',where],stdout=log,stderr=subprocess.STDOUT,timeout=30)
+

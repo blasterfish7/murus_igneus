@@ -1,18 +1,24 @@
 # Murus Igneus 0.3.0-alpha
 
-Experimental open-source IPv4 firewall targeting **Devuan 6 Excalibur / OpenRC**.
+Experimental independent open-source IPv4 firewall on Devuan 6 Excalibur / OpenRC.
+No Fortinet code, firmware or assets are used. Original MIT application notices
+are preserved alongside the repository GPL-3 license.
 
-The recovered application source is committed under `src/murus_igneus/`.
-It provides a native configuration editor and conservative import of a subset
-of text FortiGate backups. IPv4 policies, static routing, SNAT and rollback come
-from the original OpenWall laboratory prototype; they require renewed runtime
-verification after migration and rebranding.
+The native editor can configure a firewall from scratch; importing a supported
+subset of a plaintext FortiGate backup is optional. Features include nftables
+policies/SNAT, static routing, confirmed apply with rollback, WireGuard peers,
+Suricata inline IPS and an explicit HTTP download proxy using ClamAV.
 
-A `.deb` build and native OpenRC service are now provided in `packaging/devuan/`.
-See [docs/DEVUAN.md](docs/DEVUAN.md). The package targets an already installed
-Devuan laboratory VM and is not started automatically during installation.
+`tools/build-devuan-iso.sh` builds a fresh system from signed Devuan `main`
+packages. The live interface includes a disk installer requiring the exact
+selected disk to be confirmed before erasure. A separate `.deb` build supports
+existing dedicated Devuan VMs.
 
-**No Devuan bootable ISO has been built or validated.** A web disk installer,
-VPN, UTM/Suricata/ClamAV and AI are planned and not implemented in this alpha.
-The known lab password is not suitable for exposed or production deployments.
-Original MIT application attribution is preserved alongside repository notices.
+ClamAV scanning applies only to HTTP GET/HEAD downloads through the proxy,
+up to 20 MiB. HTTPS antivirus inspection, IPsec and AI are not implemented.
+ClamAV requires official signature downloads; the two bundled local IPS rules
+provide limited coverage until community rules are downloaded.
+
+See [the Devuan guide](docs/DEVUAN.md) and [validation status](SOURCE_STATUS.md).
+The lab web login is `admin` / `igneus`; a fresh ISO also uses root / `igneus`.
+The `.deb` preserves existing credentials and never changes the root password.

@@ -1,8 +1,8 @@
 # Devuan 6 Excalibur / OpenRC
 
 Murus Igneus 0.3.0-alpha now has a Debian-format package for an **existing Devuan
-6 Excalibur amd64 laboratory VM**. This is a packaging and service migration;
-it is not a bootable ISO or a verified replacement for the previous Alpine ISO.
+6 Excalibur amd64 laboratory VM** and a fresh ISO builder with live web installer.
+See `SOURCE_STATUS.md` for current build and runtime verification status.
 
 ## Distribution and software provenance
 
@@ -13,9 +13,9 @@ Use the official `devuan-keyring` and APT signature verification. Never enable
 
 The official Devuan live ISOs include non-free firmware. Therefore, merely
 remastering an unmodified live ISO does not satisfy this project's free-software
-requirement. The future Murus ISO must bootstrap from signed main packages, or
-remove non-free components and verify both the root filesystem and initramfs.
-No such image is included or claimed as tested here.
+requirement. The Murus builder instead bootstraps a fresh root from signed main
+packages and rejects non-free/contrib and firmware/microcode package names.
+The builder seed is not copied into the target image.
 
 References:
 - https://www.devuan.org/os/releases
@@ -83,13 +83,43 @@ These checks do not replace boot/runtime tests on Devuan. OpenRC startup,
 VirtIO naming, networking, real packet filtering/NAT, reboot persistence and
 service failure/rollback behavior still require VM regression testing.
 
-## Outstanding requested functionality
+## ISO build
 
-- ISO builder and bootable ISO, with a web disk-installation workflow.
-- WireGuard/IPsec VPN integrated with policies, routes and protected keys.
-- Suricata IPS, antivirus with ClamAV and signature updates, traffic/proxy
-  integration, filtering and accurate protection status in the GUI.
-- HTTPS file scanning requires an explicit TLS inspection design and certificate
-  deployment. Installing antivirus packages alone does not inspect transit TLS.
+Run only in an isolated privileged Devuan builder, never on a workstation:
 
-VPN, UTM and AI remain planned, not operational features in this package.
+```sh
+bash tools/build-devuan-iso.sh
+```
+
+Outputs under `dist/`: hybrid BIOS/UEFI amd64 ISO, `SHA256SUMS` and
+`packages-devuan.tsv`. GitHub Actions builds on branch pushes. Secure Boot is
+not provided. Management is the first NIC (`eth0`), DHCP with a
+`192.168.56.1/24` fallback. The second and third NICs are configured in the UI.
+A fresh ISO uses root / `igneus` and web admin / `igneus`.
+
+Boot the ISO, open HTTPS management on port 8443 and choose configuration from
+scratch or optional backup import. Use **Installa su disco** to list unmounted
+disks of at least 8 GiB, preview the operation and type `CANCELLA /dev/DEVICE`
+for the exact selected disk. The installer erases the whole disk, installs GPT
+BIOS/EFI boot and ext4, and copies confirmed configuration, keys and signatures.
+After successful completion, power off, remove the ISO and boot the disk.
+Live-session changes are otherwise temporary.
+
+## VPN and UTM scope
+
+- WireGuard: server key stays on the appliance; enter client public keys and
+  specific remote CIDRs. The synthetic VPN interface participates in policies.
+  IPsec and FortiGate VPN conversion are not included.
+- Suricata: inline IPv4 forwarding inspection after policy filtering, NFQUEUE
+  without bypass. If the engine stops, queued traffic is dropped. Two local HTTP
+  signatures are included; download community rules for broader coverage.
+- ClamAV: explicit HTTP proxy on the selected data NIC, port 3128, client CIDR
+  and destination ACLs, domain blocking, GET/HEAD downloads up to 20 MiB.
+  Download official definitions before enabling it. Content is delivered only
+  after a successful clean scan. CONNECT and HTTPS antivirus inspection are
+  unavailable. Proxy-originated traffic uses its own destination ACL rather
+  than forwarding policies.
+- Signature updates run as visible background jobs. Reapply the configuration
+  to reload updated signatures. AI is not implemented.
+
+Real VM validation is tracked separately in `SOURCE_STATUS.md`.
