@@ -15,6 +15,9 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from migration import translate, baseline, Error
 from configuration import compile_config, from_backup, empty
+import security
+import installer
+import jobs
 
 STATE=Path('/etc/murus_igneus');MGMT=os.environ.get('MURUS_MANAGEMENT_INTERFACE','eth0');LOCK=threading.RLock()
 if not re.fullmatch(r'[A-Za-z0-9_.-]{1,15}',MGMT) or MGMT=='lo':raise ValueError('Interfaccia di gestione non valida')
@@ -72,20 +75,24 @@ def rollback(ident):
         if not PENDING or PENDING['id']!=ident:return
         p=PENDING
         for args in reversed(p['undo']):run(args,check=False)
+        try:security.activate(p['security'])
+        except Exception as e:LAST='Ripristino servizi fallito: '+str(e)
         run(['nft','-f','-'],p['old']);run(['conntrack','-F'],check=False)
         run(['sysctl','-w','net.ipv4.ip_forward='+p['forward']],check=False)
         PENDING=None;LAST='Modifica annullata; ripristinata la configurazione precedente'
 
 def apply(plan):
     global PENDING,LAST
-    if PENDING:raise Error('Confermare o annullare la modifica pendente')
+    if PENDING or jobs.busy():raise Error('Confermare la modifica o attendere la manutenzione in corso')
     if not plan or not plan['ready']:raise Error('Migrazione non validata o con incompatibilità')
     run(['nft','--check','-f','-'],plan['nftables'])
     old=run(['nft','list','table','inet','murus_igneus']);ident=secrets.token_hex(16)
-    PENDING={'id':ident,'deadline':time.time()+90,'undo':[],'old':'add table inet murus_igneus\nflush table inet murus_igneus\n'+old,'forward':Path('/proc/sys/net/ipv4/ip_forward').read_text().strip(),'plan':plan}
+    PENDING={'id':ident,'deadline':time.time()+90,'undo':[],'old':'add table inet murus_igneus\nflush table inet murus_igneus\n'+old,'forward':Path('/proc/sys/net/ipv4/ip_forward').read_text().strip(),'plan':plan,'security':ACTIVE.get('security',security.defaults()) if ACTIVE else security.defaults()}
     try:
         run(['nft','-f','-'],baseline(MGMT))
         remove_previous(ACTIVE['network_ops'] if ACTIVE else [],plan['network_ops'],PENDING['undo'])
+        settings=plan.get('security',security.defaults())
+        security.activate(settings)
         network(plan['network_ops'],PENDING['undo']);run(['nft','-f','-'],plan['nftables'])
         run(['conntrack','-F']);run(['sysctl','-w','net.ipv4.ip_forward=1'])
     except Exception:
@@ -114,8 +121,11 @@ class Handler(BaseHTTPRequestHandler):
             with LOCK:
                 if self.path=='/api/status':
                     links=json.loads(run(['ip','-j','link']))
-                    self.reply(200,{'version':'0.3.0-alpha','csrf':CSRF,'management':MGMT,'links':[x['ifname'] for x in links if x['ifname'] not in (MGMT,'lo')],'last':LAST,'pending':{'id':PENDING['id'],'deadline':PENDING['deadline']} if PENDING else None})
-                elif self.path=='/api/configuration':self.reply(200,{'configuration':ACTIVE.get('configuration') if ACTIVE else empty(),'legacy':bool(ACTIVE and not ACTIVE.get('configuration'))})
+                    self.reply(200,{'version':'0.3.0-alpha','csrf':CSRF,'management':MGMT,'links':[x['ifname'] for x in links if x['ifname'] not in (MGMT,'lo')],'last':LAST,'maintenance':jobs.busy(),'pending':{'id':PENDING['id'],'deadline':PENDING['deadline']} if PENDING else None})
+                elif self.path=='/api/configuration':self.reply(200,{'configuration':ACTIVE.get('configuration') if ACTIVE else {**empty(),**security.defaults()},'legacy':bool(ACTIVE and not ACTIVE.get('configuration'))})
+                elif self.path=='/api/installer':self.reply(200,installer.inventory())
+                elif self.path=='/api/security':self.reply(200,security.health())
+                elif self.path=='/api/job':self.reply(200,jobs.status())
                 elif self.path=='/api/rules':self.reply(200,{'rules':run(['nft','list','table','inet','murus_igneus'])})
                 elif self.path=='/api/logs':self.reply(200,{'logs':'\n'.join(x for x in run(['dmesg'],check=False).splitlines() if 'OW policy' in x)[-30000:]})
                 elif self.path in ('/','/app.js','/style.css'):
@@ -132,10 +142,23 @@ class Handler(BaseHTTPRequestHandler):
             if not 0<length<=9*1024**2 or self.headers.get('Content-Type')!='application/json':raise Error('Richiesta non valida')
             data=json.loads(self.rfile.read(length))
             with LOCK:
-                if self.path=='/api/preview':
+                if self.path in ('/api/installer/preview','/api/installer/start','/api/security/update','/api/vpn/key'):
+                    if PENDING or jobs.busy():raise Error('Modifica o manutenzione in corso')
+                    if self.path=='/api/installer/preview':self.reply(200,installer.preview(data.get('disk')))
+                    elif self.path=='/api/installer/start':self.reply(200,installer.start(data))
+                    elif self.path=='/api/vpn/key':self.reply(200,{'public_key':security.public_key()})
+                    else:
+                        engine=data.get('engine')
+                        if engine not in ('clamav','suricata'):raise Error('Motore non valido')
+                        args=['freshclam','--stdout'] if engine=='clamav' else ['suricata-update','--no-test','--no-reload']
+                        self.reply(200,jobs.start('Aggiornamento '+engine,lambda log:jobs.run(args,log,timeout=1800)))
+                elif self.path=='/api/preview':
                     if PENDING:raise Error('Modifica pendente')
                     PLAN=None
-                    PLAN=from_backup(data.get('backup'),data.get('mapping',{}),MGMT);PLAN['plan_id']=secrets.token_hex(16);self.reply(200,PLAN)
+                    PLAN=from_backup(data.get('backup'),data.get('mapping',{}),MGMT)
+                    if PLAN.get('configuration') and ACTIVE:
+                        PLAN['configuration'].update(ACTIVE.get('security',security.defaults()));PLAN=compile_config(PLAN['configuration'],MGMT)
+                    PLAN['plan_id']=secrets.token_hex(16);self.reply(200,PLAN)
                 elif self.path=='/api/configuration/preview':
                     if PENDING:raise Error('Modifica pendente')
                     PLAN=None
@@ -162,6 +185,7 @@ def main():
         try:
             plan=json.loads((STATE/'active.json').read_text())
             if not plan['ready']:raise Error('Piano salvato non valido')
+            security.activate(plan.get('security',security.defaults()))
             run(['nft','--check','-f','-'],plan['nftables']);network(plan['network_ops'],undo)
             run(['nft','-f','-'],plan['nftables']);run(['sysctl','-w','net.ipv4.ip_forward=1']);LAST='Configurazione salvata ripristinata';ACTIVE=plan
         except Exception as e:

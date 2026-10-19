@@ -128,3 +128,30 @@ def from_backup(text,mapping,management='eth0'):
     plan=compile_config(c,management)
     if plan['nftables']!=original['nftables'] or plan['network_ops']!=original['network_ops']:raise Error('Conversione editor non equivalente: importazione bloccata')
     plan['warnings']+=original['warnings'];return plan
+
+
+_compile_base=compile_config
+def compile_config(config,management='eth0'):
+    import copy
+    import security
+    if not isinstance(config,dict):raise Error('Configurazione non valida')
+    settings=security.validate(config,management)
+    original=copy.deepcopy(config);base={k:v for k,v in original.items() if k not in ('vpn','utm')}
+    for row in base.get('interfaces',[]):
+        if row.get('name')=='VPN' or row.get('device')==security.WG:raise Error('VPN/mivpn0 sono riservati al tunnel')
+    devices={r.get('device') for r in base.get('interfaces',[])}
+    if settings['vpn']['enabled']:
+        if settings['vpn']['public_device'] not in devices:raise Error('Associare la porta pubblica VPN tra le interfacce dati')
+        tunnel=ip.IPv4Interface(settings['vpn']['address'])
+        for r in base.get('interfaces',[]):
+            if r.get('address') and ip.IPv4Interface(r['address']).network.overlaps(tunnel.network):raise Error('Subnet VPN sovrapposta alle reti locali')
+        base.setdefault('interfaces',[]).append({'name':'VPN','device':security.WG,'address':''})
+    if settings['utm']['proxy']:
+        port=next((r for r in base.get('interfaces',[]) if r.get('device')==settings['utm']['proxy_device']),None)
+        if not port or not port.get('address'):raise Error('Il proxy richiede una porta dati con IPv4 statico')
+    plan=_compile_base(base,management)
+    if settings['vpn']['enabled']:plan['configuration']['interfaces']=[r for r in plan['configuration']['interfaces'] if r['name']!='VPN']
+    plan['configuration'].update(settings);plan['security']=settings
+    plan['nftables']=security.decorate(plan['nftables'],settings)
+    plan['version']='0.3.0-alpha'
+    return plan

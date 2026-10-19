@@ -13,7 +13,8 @@ jobs:
       - name: Python syntax
         run: python -m compileall -q src/murus_igneus
       - name: Migration regression tests
-        run: python -m unittest discover -s tests -p 'test_*.py' -v      - name: Shell and JavaScript syntax
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Shell and JavaScript syntax
         run: |
           sh -n packaging/devuan/build-deb.sh
           sh -n packaging/devuan/files/murus-igneus.initd
@@ -26,4 +27,25 @@ jobs:
         with:
           name: murus-igneus-devuan-alpha
           path: dist/*.deb
+          retention-days: 14
+
+  devuan-iso:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    container:
+      image: dyne/devuan:excalibur
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build signed-main Devuan appliance ISO
+        run: bash tools/build-devuan-iso.sh
+      - name: Save ISO, checksums and package manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: murus-igneus-devuan-iso
+          path: |
+            dist/*.iso
+            dist/SHA256SUMS
+            dist/packages-devuan.tsv
+          compression-level: 0
           retention-days: 14

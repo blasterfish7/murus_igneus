@@ -9,7 +9,7 @@ output=$(CDPATH='' cd -- "$output" && pwd)
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT HUP INT TERM
 install -d "$stage/DEBIAN" "$stage/usr/lib/murus-igneus" "$stage/usr/sbin" "$stage/etc/init.d" "$stage/etc/default" "$stage/usr/share/doc/murus-igneus" "$stage/etc/sysctl.d"
-for file in __init__.py server.py configuration.py migration.py index.html app.js style.css LICENSE-MIT; do
+for file in __init__.py server.py configuration.py migration.py security.py avproxy.py jobs.py installer.py index.html app.js style.css LICENSE-MIT; do
     install -m 0644 "$root/src/murus_igneus/$file" "$stage/usr/lib/murus-igneus/$file"
 done
 for file in murus-serve murus-prepare murus-info; do
@@ -28,7 +28,7 @@ Section: net
 Priority: optional
 Architecture: all
 Maintainer: Murus Igneus contributors
-Depends: python3 (>= 3.11), nftables, iproute2, openssl, conntrack, kmod, openrc, init-system-helpers
+Depends: python3 (>= 3.11), nftables, iproute2, openssl, conntrack, kmod, wireguard-tools, suricata, suricata-update, clamav, clamav-daemon, clamav-freshclam, python3-yaml, rsync, fdisk, parted, dosfstools, e2fsprogs, grub-pc-bin, grub-efi-amd64-bin, grub2-common, openrc, init-system-helpers
 Description: Experimental IPv4 firewall management for Devuan 6 Excalibur
  Independent configuration editor and conservative configuration importer.
  Includes an OpenRC service. VPN, UTM and ISO installation are not yet included.
