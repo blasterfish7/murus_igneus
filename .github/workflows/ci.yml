@@ -2,6 +2,8 @@ name: Python checks
 on:
   push:
   pull_request:
+permissions:
+  contents: read
 jobs:
   tests:
     runs-on: ubuntu-latest
@@ -12,5 +14,9 @@ jobs:
           python-version: '3.13'
       - name: Python syntax
         run: python -m compileall -q src/murus_igneus
-      - name: Migration regression tests
+      - name: Static checks (real errors only: undefined names, unused imports, syntax)
+        run: |
+          python -m pip install --quiet ruff==0.16.8
+          ruff check --select F,E9 src tests
+      - name: Regression tests
         run: python -m unittest discover -s tests -p 'test_*.py' -v

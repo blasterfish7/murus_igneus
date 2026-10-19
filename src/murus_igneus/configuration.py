@@ -1,7 +1,10 @@
 """Native editable Murus Igneus configuration. SPDX-License-Identifier: MIT."""
 import ipaddress as ip
 import json
-from migration import translate, parse, one, flag, net, Error
+try:
+    from .migration import translate, parse, one, flag, net, ports, Error, VERSION
+except ImportError:  # run as a script from this directory (how the service starts)
+    from migration import translate, parse, one, flag, net, ports, Error, VERSION
 
 KINDS=('interfaces','addresses','groups','services','service_groups','policies','routes')
 BUILTINS=('ALL','HTTP','HTTPS','SSH','DNS','PING','ALL_TCP','ALL_UDP')
@@ -95,13 +98,12 @@ def compile_config(config,management='eth0'):
         for name in graph:visit(name,())
     validate_groups(c['groups'],{'all'}|{r['name'] for r in c['addresses']})
     validate_groups(c['service_groups'],set(BUILTINS)|{r['name'] for r in c['services']})
-    from migration import ports
     for r in c['services']:
         ports(r.get('tcp','').split());ports(r.get('udp','').split())
     check=translate(source.replace('set status "disable"','set status "enable"'),mapping,management)
     plan['blockers']+=check['blockers']
     plan['blockers']=list(dict.fromkeys(plan['blockers']));plan['ready']=not plan['blockers']
-    plan['version']='0.2.0';plan['configuration']=c
+    plan['version']=VERSION;plan['configuration']=c
     return plan
 
 def from_backup(text,mapping,management='eth0'):

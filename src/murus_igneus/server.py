@@ -4,7 +4,6 @@ import hashlib
 import hmac
 import ipaddress
 import json
-import os
 from pathlib import Path
 import secrets
 import ssl
@@ -13,8 +12,12 @@ import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from migration import translate, baseline, Error
-from configuration import compile_config, from_backup, empty
+try:
+    from .migration import VERSION, baseline, Error
+    from .configuration import compile_config, from_backup, empty
+except ImportError:  # run as a script from this directory (how the service starts)
+    from migration import VERSION, baseline, Error
+    from configuration import compile_config, from_backup, empty
 
 STATE=Path('/etc/murus_igneus');MGMT='eth0';LOCK=threading.RLock()
 CSRF_HEADER='X-Murus-Igneus-CSRF'  # must be a valid HTTP token (no spaces): browsers reject anything else
@@ -36,6 +39,8 @@ def network(ops,undo):
         dev=op['interface']
         if dev not in available or dev in ('lo',MGMT):raise Error('Scheda dati assente o riservata')
         if op['kind']=='address' and any(ipaddress.IPv4Interface(op['address']).network.overlaps(n) for n in reserved):raise Error('La rete importata si sovrappone alla rete di gestione')
+        # A route more specific than the management network would win over the connected route and cut the admin off.
+        if op['kind']=='route' and any(ipaddress.IPv4Network(op['destination']).subnet_of(n) for n in reserved):raise Error('La rotta ricade nella rete di gestione')
     for op in ops:
         dev=op['interface'];info=json.loads(run(['ip','-j','link','show','dev',dev]))[0]
         if 'UP' not in info['flags']:
@@ -94,7 +99,7 @@ def apply(plan):
     LAST='Applicata temporaneamente: confermare entro 90 secondi';return ident
 
 class Handler(BaseHTTPRequestHandler):
-    server_version='Murus Igneus/0.2'
+    server_version='Murus Igneus/'+VERSION
     timeout=15  # applies to the TLS handshake and to every socket read
     def setup(self):
         # The handshake runs here, in the request thread, so a silent client cannot stall accept().
@@ -119,7 +124,7 @@ class Handler(BaseHTTPRequestHandler):
             with LOCK:
                 if self.path=='/api/status':
                     links=json.loads(run(['ip','-j','link']))
-                    self.reply(200,{'version':'0.2.0','csrf':CSRF,'management':MGMT,'links':[x['ifname'] for x in links if x['ifname'] not in (MGMT,'lo')],'last':LAST,'pending':{'id':PENDING['id'],'deadline':PENDING['deadline']} if PENDING else None})
+                    self.reply(200,{'version':VERSION,'csrf':CSRF,'management':MGMT,'links':[x['ifname'] for x in links if x['ifname'] not in (MGMT,'lo')],'last':LAST,'pending':{'id':PENDING['id'],'deadline':PENDING['deadline'],'remaining':max(0,PENDING['deadline']-time.time())} if PENDING else None})
                 elif self.path=='/api/configuration':self.reply(200,{'configuration':ACTIVE.get('configuration') if ACTIVE else empty(),'legacy':bool(ACTIVE and not ACTIVE.get('configuration'))})
                 elif self.path=='/api/rules':self.reply(200,{'rules':run(['nft','list','table','inet','murus_igneus'])})
                 elif self.path=='/api/logs':self.reply(200,{'logs':'\n'.join(x for x in run(['dmesg'],check=False).splitlines() if 'OW policy' in x)[-30000:]})
