@@ -1,0 +1,33 @@
+#!/sbin/openrc-run
+# SPDX-License-Identifier: MIT
+name="Murus Igneus"
+command="/usr/bin/python3"
+command_args="/usr/lib/murus-igneus/server.py"
+command_background="yes"
+pidfile="/run/murus-igneus.pid"
+output_log="/var/log/murus-igneus.log"
+error_log="/var/log/murus-igneus.log"
+depend() {
+    after networking localmount mountall bootmisc
+}
+start_pre() {
+    set -a
+    . /etc/default/murus-igneus
+    set +a
+    modprobe nf_tables || return 1
+    modprobe nf_conntrack || return 1
+    modprobe nft_chain_nat || return 1
+    modprobe nft_masq || return 1
+    modprobe nf_log_syslog 2>/dev/null || true
+    /usr/sbin/murus-prepare || return 1
+}
+start_post() {
+    local attempt=0
+    while [ "$attempt" -lt 300 ]; do
+        ss -ltnH | grep -q ':8443 ' && return 0
+        attempt=$((attempt+1))
+        sleep 1
+    done
+    eerror "HTTPS non avviato: consultare /var/log/murus-igneus.log"
+    return 1
+}
