@@ -1,21 +1,64 @@
 # Verification status — 0.3.0-alpha.2
 
-AI/SNMP update, 2026-10-20 (Europe/Rome). Still laboratory software.
+Verified 2026-10-20 (Europe/Rome). Laboratory software, not a production release.
 
-This branch adds the local Ollama/Qwen3 connector, validated AI draft proposals,
-SNMPv2c/v3 inventory, IF-MIB/LLDP polling and preview/confirmation for port up/down.
-It also reconciles the Claude TLS, CSRF, version, management-route and nested-group
-fixes with the working Devuan VPN/UTM/installer implementation. Other integration
-branches have not been overwritten or merged.
+## Delivered build
 
-94 automated tests are present, including real loopback Net-SNMP v2c and v3 SHA/AES
-protocol tests (three skip if the tools are absent). Two git-ignore tests require
-an actual git checkout. AI HTTP protocol and proposal validation use a controlled
-local fixture; separate real-model/browser verification is recorded in the PR.
+Build source: `e749f34fb5ab5e497197241e8c1879a62555cbe4`.
+Actions: https://github.com/blasterfish7/murus_igneus/actions/runs/39339700961
+PR: https://github.com/blasterfish7/murus_igneus/pull/5
 
-The previous ISO traffic and installation checks below apply to alpha.1 only.
-New builds must not inherit the old ISO hash or a claim of full runtime revalidation.
-See [setup and boundaries](docs/AI-SWITCHES.md).
+ISO: `murus-igneus-0.3.0-alpha.2-devuan-amd64.iso`, 472274944 bytes.
+SHA-256: `fa3ee325e358401563e5350588b0cdec84833855f1de1310a849888b953b74ba`.
+
+Package: `murus-igneus_0.3.0~alpha.2_all.deb`, 60312 bytes.
+SHA-256: `52f16678adac14d34db2b48ffb8c94de020073f63d8021af8605be0aff21d9f3`.
+
+Fresh signed-main Devuan 6 Excalibur / OpenRC. SNMP client package included;
+Ollama runtime and model weights are not bundled. Official ClamAV main/daily/
+bytecode downloads and database validation succeeded during the build.
+The engine remains Devuan 1.4.3; FreshClam recommends 1.4.6. This gap is open.
+
+## Completed alpha.2 checks
+
+- 94 automated tests pass locally and in Actions, with no skips in the full
+  tool-equipped run. Includes real loopback Net-SNMP v2c and v3 SHA/AES tests.
+- Python lint/compile, JavaScript/shell syntax, .deb metadata and package/source
+  comparison pass. Artifact ZIP and ISO checksums were verified after download.
+- Browser checks pass for AI settings/check/chat, switch inventory and ports,
+  protected uplinks and typed one-use port confirmation, with no JavaScript
+  errors. These UI paths use controlled local API fixtures.
+- Separately, actual Net-SNMP clients and a local agent passed GET/walk and SET
+  round trips for v2c and encrypted v3. SET targets were synthetic ifAdminStatus
+  values, never host interfaces or physical switches.
+- Real Ollama 0.40.6 with Qwen3:4b on CPU returned analysis. It also produced
+  incorrect interpretations and invalid configuration proposals; those were
+  refused by the native validator. Real-model valid-proposal quality remains
+  unverified. Deterministic draft facts are shown separately from model output;
+  all proposals still require validation and explicit human review/application.
+- The exact delivered ISO booted in UEFI under QEMU TCG, 2 vCPU / 3 GiB RAM /
+  three VirtIO NICs. Live AI/SNMP APIs, installed SNMP tools, secret redaction
+  and 0600 credential-file permissions were verified.
+- The live web installer completed on a disposable 10 GiB disk. After shutdown,
+  the disk booted in UEFI with no ISO attached. AI endpoint settings and SNMP
+  inventory/credentials persisted, while credentials remained absent from API
+  output. The installer correctly reports a non-live installed system.
+- All test VMs were powered off after validation.
+
+## Scope and limits
+
+This update reconciles the Claude TLS, CSRF, version, management-route and nested group fixes with the functional Devuan VPN/UTM/web installer implementation.
+Other integration branches were not overwritten or merged.
+
+Switch management is manual inventory, IF-MIB/LLDP monitoring and explicit
+Ethernet admin-state up/down. No VLAN, trunk, LAG, PoE, firmware or FortiLink
+adoption. Physical-switch compatibility is unverified. Port SET has no automatic
+rollback; permanent save depends on the switch.
+
+The new ISO installation/API tests do not re-attest every previous VPN/IPS/AV
+traffic test. Those alpha.1 results below are historical evidence for the
+existing stack, not measurements of the alpha.2 binary. HTTPS antivirus and
+IPsec remain absent. See [setup and boundaries](docs/AI-SWITCHES.md).
 
 ---
 
