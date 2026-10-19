@@ -30,10 +30,11 @@ jobs:
           retention-days: 14
 
   devuan-iso:
+    if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     container:
-      image: dyne/devuan:excalibur
+      image: dyne/devuan:excalibur@sha256:10f6138df94c08164f300a2f35f96cd8c8966fc4948550dbe0485149d020248f
       options: --privileged
     steps:
       - uses: actions/checkout@v4

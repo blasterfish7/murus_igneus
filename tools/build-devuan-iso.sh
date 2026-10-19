@@ -4,7 +4,7 @@
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 source /etc/os-release
-[[ ${ID:-} == devuan && ${VERSION_CODENAME:-} == excalibur ]] || { echo 'Devuan 6 Excalibur build environment required'; exit 1; }
+[[ ${ID:-} == devuan ]] || { echo 'An isolated Devuan builder is required'; exit 1; }
 [[ $EUID == 0 ]] || { echo 'Root in an isolated builder is required'; exit 1; }
 project=$(cd -- "$(dirname -- "$0")/.." && pwd)
 work=${MURUS_BUILD_DIR:-/var/tmp/murus-build}
@@ -13,6 +13,8 @@ iso=$work/iso
 out=${MURUS_OUTPUT_DIR:-$project/dist}
 [[ ! -e $root && ! -e $iso ]] || { echo 'Use a new empty build directory'; exit 1; }
 mkdir -p "$work" "$out"
+cp "$project/packaging/devuan/sources.list" /etc/apt/sources.list
+rm -f /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources
 apt-get update
 apt-get install -y --no-install-recommends devuan-keyring debootstrap gnupg ca-certificates squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin grub2-common mtools dosfstools python3
 # Native Devuan debootstrap performs release signature verification. No non-free repository is enabled.
