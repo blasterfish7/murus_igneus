@@ -154,7 +154,14 @@ def ask(state, data, management, switch_summary=None, logs=''):
                 payload['messages'][0]['content'] += ('\nRispondi con un oggetto JSON: campo answer con spiegazione '
                     'e campo configuration con la configurazione nativa completa proposta, oppure null. '
                     'Conserva i campi VPN/UTM e gli elementi non interessati dalla modifica. '
-                    'La proposta sarà solo una bozza da verificare, non sarà applicata.')
+                    'La proposta sarà solo una bozza da verificare, non sarà applicata. '
+                    'Schema nativo: schema=1; interfaces usa name,device,address; '
+                    'addresses usa ESATTAMENTE name,subnet (subnet è un CIDR IPv4: non usare ip,cidr,address o type); '
+                    'groups e service_groups usano name,members; services usa name,tcp,udp (porte come stringhe); '
+                    'policies usa id (stringa numerica),name,srcintf,dstintf,srcaddr,dstaddr,service '
+                    '(selezioni come array),action (accept/deny),nat,log,enabled (booleani); '
+                    'routes usa id,destination,gateway,interface,distance,priority,enabled. '
+                    'Non aggiungere chiavi non previste. Per VPN e UTM conserva gli oggetti forniti nel contesto.')
             result = request(settings, '/api/chat', payload, timeout=240 if allow_proposal else 120)
             try:
                 content = result['message']['content']
@@ -184,7 +191,7 @@ def ask(state, data, management, switch_summary=None, logs=''):
                         output['warnings'] = candidate['warnings']
                     else:
                         output['proposal_errors'] = candidate['blockers']
-                except (ValueError, TypeError, KeyError, RecursionError):
-                    output['proposal_errors'] = ['Proposta rifiutata dal validatore della configurazione']
+                except (ValueError, TypeError, KeyError, RecursionError) as exc:
+                    output['proposal_errors'] = ['Proposta rifiutata dal validatore: ' + str(exc)[:400]]
             return output
         return TASK.start(action)
