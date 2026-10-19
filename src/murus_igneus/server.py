@@ -9,6 +9,7 @@ from pathlib import Path
 import secrets
 import ssl
 import subprocess
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -16,6 +17,7 @@ from migration import translate, baseline, Error
 from configuration import compile_config, from_backup, empty
 
 STATE=Path('/etc/murus_igneus');MGMT='eth0';LOCK=threading.RLock()
+CSRF_HEADER='X-Murus-Igneus-CSRF'  # must be a valid HTTP token (no spaces): browsers reject anything else
 CSRF=secrets.token_urlsafe(32);PLAN=None;PENDING=None;LAST='Nessuna configurazione applicata';ACTIVE=None
 
 def run(args,data=None,check=True):
@@ -93,9 +95,14 @@ def apply(plan):
 
 class Handler(BaseHTTPRequestHandler):
     server_version='Murus Igneus/0.2'
+    timeout=15  # applies to the TLS handshake and to every socket read
+    def setup(self):
+        # The handshake runs here, in the request thread, so a silent client cannot stall accept().
+        self.request.settimeout(self.timeout);self.request.do_handshake();super().setup()
     def log_message(self,*_):pass
     def auth(self):
-        expected='admin:'+(STATE/'admin.password').read_text().strip()
+        try:expected='admin:'+(STATE/'admin.password').read_text().strip()
+        except OSError:self.reply(503,{'error':'Credenziali non disponibili'});return False
         try:
             h=self.headers.get('Authorization','');actual=base64.b64decode(h[6:],validate=True).decode() if h.startswith('Basic ') else ''
         except Exception:actual=''
@@ -124,11 +131,12 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         global PLAN,PENDING,LAST,ACTIVE
         if not self.auth():return
-        if not hmac.compare_digest(self.headers.get('X-Murus Igneus-CSRF',''),CSRF):return self.reply(403,{'error':'Token CSRF non valido'})
+        if not hmac.compare_digest(self.headers.get(CSRF_HEADER,'').encode('utf-8','replace'),CSRF.encode()):return self.reply(403,{'error':'Token CSRF non valido'})
         try:
             length=int(self.headers.get('Content-Length','0'))
             if not 0<length<=9*1024**2 or self.headers.get('Content-Type')!='application/json':raise Error('Richiesta non valida')
             data=json.loads(self.rfile.read(length))
+            if not isinstance(data,dict):raise Error('Richiesta non valida')
             with LOCK:
                 if self.path=='/api/preview':
                     if PENDING:raise Error('Modifica pendente')
@@ -149,6 +157,19 @@ class Handler(BaseHTTPRequestHandler):
                     self.reply(200,{'ok':True})
                 else:self.reply(404,{'error':'Risorsa assente'})
         except (ValueError,KeyError,TypeError,RecursionError,subprocess.TimeoutExpired) as e:self.reply(400,{'error':str(e)})
+        except Exception:self.reply(500,{'error':'Errore interno'})
+
+class Server(ThreadingHTTPServer):
+    daemon_threads=True
+    def handle_error(self,request,client_address):
+        # Failed handshakes and client timeouts are routine on a network-facing port; anything else is a bug.
+        if not isinstance(sys.exc_info()[1],OSError):super().handle_error(request,client_address)
+
+def make_server(host,port,cert,key):
+    ctx=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);ctx.minimum_version=ssl.TLSVersion.TLSv1_2;ctx.load_cert_chain(cert,key)
+    server=Server((host,port),Handler)
+    server.socket=ctx.wrap_socket(server.socket,server_side=True,do_handshake_on_connect=False)
+    return server
 
 def main():
     global LAST,ACTIVE
@@ -168,7 +189,6 @@ def main():
     cert,key=STATE/'server.crt',STATE/'server.key'
     if not cert.exists() or not key.exists():
         run(['openssl','req','-x509','-newkey','rsa:2048','-sha256','-nodes','-days','3650','-subj','/CN=murus_igneus.local','-keyout',str(key),'-out',str(cert)]);key.chmod(0o600)
-    server=ThreadingHTTPServer(('0.0.0.0',8443),Handler);ctx=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);ctx.minimum_version=ssl.TLSVersion.TLSv1_2
-    ctx.load_cert_chain(cert,key);server.socket=ctx.wrap_socket(server.socket,server_side=True);server.serve_forever()
+    make_server('0.0.0.0',8443,cert,key).serve_forever()
 
 if __name__=='__main__':main()
