@@ -16,7 +16,7 @@ mkdir -p "$work" "$out"
 cp "$project/packaging/devuan/sources.list" /etc/apt/sources.list
 rm -f /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources
 apt-get update
-apt-get install -y --no-install-recommends devuan-keyring debootstrap gnupg ca-certificates squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin grub2-common mtools dosfstools python3
+apt-get install -y --no-install-recommends devuan-keyring debootstrap gnupg ca-certificates squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin grub2-common mtools dosfstools python3 xz-utils
 # Native Devuan debootstrap performs release signature verification. No non-free repository is enabled.
 debootstrap --force-check-gpg --variant=minbase --include=devuan-keyring excalibur "$root" http://deb.devuan.org/merged
 cleanup() {
