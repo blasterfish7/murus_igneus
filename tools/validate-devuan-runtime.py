@@ -11,7 +11,7 @@ def api(path,data=None):
  if data is not None:headers.update({'Content-Type':'application/json','X-Murus-Igneus-CSRF':CSRF})
  req=urllib.request.Request('https://127.0.0.1:8443/api/'+path,headers=headers,data=json.dumps(data).encode() if data is not None else None)
  try:
-  with opener.open(req,timeout=300) as r:result=json.load(r)
+  with opener.open(req,timeout=600) as r:result=json.load(r)
  except urllib.error.HTTPError as e:raise RuntimeError(e.read().decode()) from e
  if path=='status':CSRF=result['csrf']
  return result

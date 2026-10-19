@@ -191,7 +191,8 @@ def antivirus_start(u):
     # Private local socket; network clients can only access the controlled HTTP proxy.
     conf='LocalSocket '+str(RUN/'clamd.sock')+'\nLocalSocketMode 600\nDatabaseDirectory /var/lib/clamav\nForeground yes\nMaxThreads 2\nMaxQueue 8\nStreamMaxLength 20M\nMaxFileSize 20M\nMaxScanSize 40M\nAlertExceedsMax yes\nAlertEncrypted yes\n'
     write(RUN/'clamd.conf',conf);spawn('clamd',['clamd','--config-file='+str(RUN/'clamd.conf')])
-    for _ in range(120):
+    deadline=time.monotonic()+300
+    while time.monotonic()<deadline:
         if PROCESSES['clamd'].poll() is not None:raise Error('ClamAV non avviato: '+(RUN/'clamd.log').read_text()[-1500:])
         if clam_ping():break
         time.sleep(.5)

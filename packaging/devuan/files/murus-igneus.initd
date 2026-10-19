@@ -23,7 +23,7 @@ start_pre() {
 }
 start_post() {
     local attempt=0
-    while [ "$attempt" -lt 300 ]; do
+    while [ "$attempt" -lt 900 ]; do
         ss -ltnH | grep -q ':8443 ' && return 0
         attempt=$((attempt+1))
         sleep 1
