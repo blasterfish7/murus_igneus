@@ -16,7 +16,8 @@ existing dedicated Devuan VMs.
 
 ClamAV scanning applies only to HTTP GET/HEAD downloads through the proxy,
 up to 20 MiB. HTTPS antivirus inspection, IPsec and AI are not implemented.
-ClamAV requires official signature downloads; the two bundled local IPS rules
+ClamAV requires official signatures, bundled when the build-time download
+succeeds or downloaded from the UTM page. The two bundled local IPS rules
 provide limited coverage until community rules are downloaded.
 
 See [the Devuan guide](docs/DEVUAN.md) and [validation status](SOURCE_STATUS.md).

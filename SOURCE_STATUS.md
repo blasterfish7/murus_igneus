@@ -4,7 +4,7 @@ Source integrates a Devuan 6 Excalibur ISO builder, native `.deb`/OpenRC service
 a live web disk installer, WireGuard, Suricata NFQUEUE IPS and ClamAV-backed
 explicit HTTP download proxy. The firewall can be configured without a backup.
 
-Verified: 47 automated tests, application/JavaScript/shell syntax and `.deb`
+Verified: 48 automated tests, application/JavaScript/shell syntax and `.deb`
 build. Tests cover configuration/migration, CSRF, VPN route conflicts, IPS queue
 compilation and destructive installer confirmation checks.
 
@@ -16,11 +16,15 @@ passed for HTTP forwarding/SNAT, deny and rollback, Suricata HTTP signature
 blocking, engine-termination fail-closed behavior, WireGuard handshake and
 policy-controlled VPN-to-LAN traffic including deny/rollback.
 
-Disk installation, installed-system reboot and UEFI boot tests are pending.
-Official ClamAV definitions and AV proxy functional checks are pending:
-the build environment's database download returned HTTP 403; VM network is restricted in this environment (public DNS is unavailable).
-The builder attempts an official signature download separately and records
-its result in `signature-status.txt`. No complete malware protection is claimed without signatures.
+The web installer backend completed GPT BIOS/EFI/ext4 installation on a
+disposable 10 GiB disk. The installed system then booted in BIOS mode without
+the ISO; confirmed physical interface configuration/NAT and the VPN server key
+were preserved, and the live-only installer was disabled.
+
+UEFI boot, browser installation flow and full ClamAV proxy checks are pending.
+The official ClamAV database download succeeded in the GitHub build, so that
+build includes validated official signatures. The local VM environment cannot
+resolve public DNS directly; bundled databases permit offline traffic tests.
 `tools/validate-devuan-runtime.py` reproduces traffic checks only in an explicitly
 flagged disposable live VM; it must not run on real networks.
 

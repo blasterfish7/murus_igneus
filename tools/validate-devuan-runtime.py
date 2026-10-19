@@ -89,13 +89,16 @@ print('NETWORK TESTS COMPLETE',flush=True)
 if os.environ.get('MURUS_SKIP_SIGNATURE_UPDATE')=='YES':
  print('SKIP official signature download and ClamAV checks (offline lab)',flush=True);sys.exit(0)
 # Definitions must be official. A failed download must not be replaced by a fake database.
-api('security/update',{'engine':'clamav'})
-for attempt in range(600):
- j=api('job')
- if j['state']!='running':break
- time.sleep(2)
-print('CLAMAV UPDATE '+json.dumps(j),flush=True)
-if j['state']!='succeeded':raise RuntimeError('Official ClamAV definitions unavailable')
+db=Path('/var/lib/clamav')
+if not all(any((db/(name+suffix)).is_file() for suffix in ('.cvd','.cld')) for name in ('main','daily')):
+ api('security/update',{'engine':'clamav'})
+ for attempt in range(600):
+  j=api('job')
+  if j['state']!='running':break
+  time.sleep(2)
+ print('CLAMAV UPDATE '+json.dumps(j),flush=True)
+ if j['state']!='succeeded':raise RuntimeError('Official ClamAV definitions unavailable')
+else:print('Using official ClamAV databases bundled by the builder',flush=True)
 av=copy.deepcopy(config);av.update(security.defaults());av['utm'].update(proxy=True,proxy_device='lablan',clients=['198.51.100.0/24'],upstream_networks=['203.0.113.0/24'],blocked_domains=['blocked.example'])
 apply(av)
 assert request('milab-lan','http://203.0.113.2:18080/','198.51.100.1')['status']==200

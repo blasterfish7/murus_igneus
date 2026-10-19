@@ -79,9 +79,8 @@ the installed filesystem. Logs are written to `/var/log/murus-igneus.log`.
   rejection of incorrect tokens, configurable/reserved management interface.
 - Python and shell syntax and JavaScript syntax/header construction.
 
-These checks do not replace boot/runtime tests on Devuan. OpenRC startup,
-VirtIO naming, networking, real packet filtering/NAT, reboot persistence and
-service failure/rollback behavior still require VM regression testing.
+See `SOURCE_STATUS.md` for the VM evidence for each build. Automated tests and
+QEMU checks do not establish compatibility with every physical NIC or platform.
 
 ## ISO build
 
@@ -121,7 +120,9 @@ Live-session changes are otherwise temporary.
 - ClamAV: explicit HTTP proxy on the selected data NIC, port 3128, client CIDR
   and destination ACLs, domain blocking, GET/HEAD downloads up to 20 MiB.
   Download official definitions before enabling it. Content is delivered only
-  after a successful clean scan. CONNECT and HTTPS antivirus inspection are
+  after a successful clean scan. Encoded/partial upstream responses are refused
+  rather than delivered without inspecting their complete clear representation.
+  CONNECT and HTTPS antivirus inspection are
   unavailable. Proxy-originated traffic uses its own destination ACL rather
   than forwarding policies.
 - Signature updates run as visible background jobs. Reapply the configuration

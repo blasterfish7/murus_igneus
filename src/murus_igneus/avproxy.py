@@ -10,7 +10,7 @@ LIMIT=20*1024**2
 SEMAPHORE=threading.BoundedSemaphore(4)
 HOP={'connection','proxy-connection','proxy-authorization','proxy-authenticate','keep-alive','transfer-encoding','te','trailer','upgrade','content-length','host','accept-encoding','range','if-range'}
 
-def create_proxy(config,scan):
+def create_proxy(config,scan,address=('0.0.0.0',3128)):
     clients=[ip.IPv4Network(n) for n in config['clients']]
     allowed=[ip.IPv4Network(n) for n in config['upstream_networks']]
     domains=config['blocked_domains']
@@ -39,7 +39,10 @@ def create_proxy(config,scan):
                 headers={k:v for k,v in self.headers.items() if k.lower() not in HOP}
                 headers['Host']=url.netloc;headers['Connection']='close';headers['Accept-Encoding']='identity'
                 upstream.request('GET',(url.path or '/')+('?' +url.query if url.query else ''),headers=headers)
-                response=upstream.getresponse();body=response.read(LIMIT+1)
+                response=upstream.getresponse()
+                if response.getheader('Content-Encoding','identity').strip().lower() not in ('','identity'):return self.send_error(502,'Encoded responses are not supported by this download proxy')
+                if response.status==206 or response.getheader('Content-Range'):return self.send_error(502,'Partial responses are not supported by this download proxy')
+                body=response.read(LIMIT+1)
                 if len(body)>LIMIT:return self.send_error(413,'Download exceeds the antivirus scanning limit')
                 clean,message=scan(body)
                 if not clean:return self.send_error(403,'Antivirus blocked the download')
@@ -52,9 +55,10 @@ def create_proxy(config,scan):
             finally:
                 if upstream:upstream.close()
                 SEMAPHORE.release()
-    return ThreadingHTTPServer(('0.0.0.0',3128),Proxy)
+    return ThreadingHTTPServer(address,Proxy)
 
 def local_addresses():
     # Never allow the proxy to target the appliance's management/control endpoints.
     import json,subprocess
     return {a['local'] for i in json.loads(subprocess.check_output(['ip','-j','-4','addr'],text=True)) for a in i.get('addr_info',[])}
+
