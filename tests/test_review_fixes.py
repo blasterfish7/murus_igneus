@@ -97,6 +97,16 @@ class ServerTests(unittest.TestCase):
         finally:
             idle.close()
 
+    def test_status_reports_seconds_remaining_from_the_server_clock(self):
+        # The UI counts down from this value instead of comparing the server's epoch with the browser clock.
+        server.PENDING = {'id': 'x', 'deadline': time.time() + 50}
+        try:
+            pending = json.loads(self.request('GET', '/api/status')[1])['pending']
+        finally:
+            server.PENDING = None
+        self.assertTrue(0 < pending['remaining'] <= 50, pending)
+        self.assertIn('pending.local', (SRC / 'app.js').read_text())
+
     def test_missing_password_file_does_not_drop_the_connection(self):
         pw = server.STATE / 'admin.password'
         content = pw.read_text()

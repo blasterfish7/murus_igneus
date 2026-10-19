@@ -4,7 +4,7 @@ Experimental open-source Linux firewall project targeting Devuan 6 Excalibur and
 
 ## Actual status
 
-- A source recovery and rebranding of the OpenWall 0.2 prototype exists as a development ZIP, but is not yet fully committed to this GitHub branch.
+- The recovered and rebranded OpenWall 0.2 application is committed in `src/` (the original Alpine helper scripts are kept in `legacy/`). It may still be incomplete: see `SOURCE_STATUS.md`.
 - The original IPv4 firewall, static routing, NAT, configuration import and web interface need VM regression testing after migration.
 - The Devuan bootable ISO has **not** yet been built or tested.
 - AI, UTM/Suricata/ClamAV and VPN are **planned**, not implemented in this alpha.
