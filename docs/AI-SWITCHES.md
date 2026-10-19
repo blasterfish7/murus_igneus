@@ -42,7 +42,7 @@ Non esiste una chat persistente: ogni domanda ha il proprio contesto; nessuna
 cronologia viene scritta su disco da Murus. L'eventuale registrazione sul server
 Ollama dipende dalla sua configurazione. Nomi di dispositivi, descrizioni e log
 sono trattati come dati non attendibili. Un solo lavoro AI per volta; timeout
-di generazione 120 secondi. Se manca il runtime compare un errore esplicito.
+di generazione 120 secondi per le analisi, 240 secondi per le proposte. Se manca il runtime compare un errore esplicito.
 
 ## Switch tramite standard aperti
 

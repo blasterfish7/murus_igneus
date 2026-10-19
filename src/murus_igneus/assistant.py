@@ -155,7 +155,7 @@ def ask(state, data, management, switch_summary=None, logs=''):
                     'e campo configuration con la configurazione nativa completa proposta, oppure null. '
                     'Conserva i campi VPN/UTM e gli elementi non interessati dalla modifica. '
                     'La proposta sarà solo una bozza da verificare, non sarà applicata.')
-            result = request(settings, '/api/chat', payload)
+            result = request(settings, '/api/chat', payload, timeout=240 if allow_proposal else 120)
             try:
                 content = result['message']['content']
                 if not isinstance(content, str):
