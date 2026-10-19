@@ -80,9 +80,10 @@ def compile_config(config,management='eth0'):
     add('router static',routes)
     source='\n'.join(parts)+'\n';plan=translate(source,mapping,management)
     def validate_groups(items,known):
-        graph={r['name']:r['members'] for r in items}
+        graph={r['name']:r['members'] for r in items};done=set()
         def visit(name,trail):
             if name in trail:raise Error('Ciclo nei gruppi: '+name)
+            if name in done:return
             if name not in graph:
                 if name not in known:raise Error('Riferimento assente: '+name)
                 return
@@ -90,6 +91,7 @@ def compile_config(config,management='eth0'):
             if not isinstance(members,list) or not members or not all(isinstance(m,str) for m in members):raise Error('Membri del gruppo non validi: '+name)
             if len(trail)>64:raise Error('Gruppi troppo annidati')
             for m in members:visit(m,trail+(name,))
+            done.add(name)
         for name in graph:visit(name,())
     validate_groups(c['groups'],{'all'}|{r['name'] for r in c['addresses']})
     validate_groups(c['service_groups'],set(BUILTINS)|{r['name'] for r in c['services']})
