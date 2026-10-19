@@ -1,7 +1,6 @@
 """Packaging and management regression checks; no host firewall changes."""
 import base64
 import http.client
-import importlib
 import io
 import json
 import os
@@ -54,7 +53,7 @@ class PackageTests(unittest.TestCase):
     def setUpClass(cls):
         cls.temp=tempfile.TemporaryDirectory()
         subprocess.run(['sh',str(ROOT/'packaging/devuan/build-deb.sh'),cls.temp.name],check=True,capture_output=True)
-        cls.package=Path(cls.temp.name)/'murus-igneus_0.3.0~alpha.1_all.deb'
+        cls.package=Path(cls.temp.name)/'murus-igneus_0.3.0~alpha.2_all.deb'
         cls.data=tarfile.open(fileobj=io.BytesIO(subprocess.check_output(['dpkg-deb','--fsys-tarfile',str(cls.package)])))
         cls.control=tarfile.open(fileobj=io.BytesIO(subprocess.check_output(['dpkg-deb','--ctrl-tarfile',str(cls.package)])))
     @classmethod
@@ -62,7 +61,7 @@ class PackageTests(unittest.TestCase):
     def test_package_contains_native_service_and_app(self):
         for name in ('./etc/init.d/murus-igneus','./usr/sbin/murus-serve','./usr/sbin/murus-prepare','./usr/sbin/murus-info'):
             item=self.data.getmember(name);self.assertEqual(item.mode,0o755);self.assertEqual(item.uid,0);self.assertEqual(item.gid,0)
-        for name in ('server.py','configuration.py','migration.py','app.js','index.html','style.css','LICENSE-MIT'):
+        for name in ('server.py','configuration.py','migration.py','tasks.py','assistant.py','switches.py','management.js','app.js','index.html','style.css','LICENSE-MIT'):
             self.data.getmember('./usr/lib/murus-igneus/'+name)
         self.assertFalse(any('legacy' in m.name or 'admin.password' in m.name for m in self.data.getmembers()))
     def test_preinstall_checks_target_os(self):
@@ -78,3 +77,4 @@ class PackageTests(unittest.TestCase):
             fields=line.split();self.assertEqual(fields[0],'deb');self.assertEqual(fields[1],'http://deb.devuan.org/merged');self.assertEqual(fields[3:],['main']);self.assertTrue(fields[2].startswith('excalibur'))
 
 if __name__=='__main__':unittest.main()
+

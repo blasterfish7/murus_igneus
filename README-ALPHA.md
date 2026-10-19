@@ -15,7 +15,8 @@ selected disk to be confirmed before erasure. A separate `.deb` build supports
 existing dedicated Devuan VMs.
 
 ClamAV scanning applies only to HTTP GET/HEAD downloads through the proxy,
-up to 20 MiB. HTTPS antivirus inspection, IPsec and AI are not implemented.
+up to 20 MiB. HTTPS antivirus inspection and IPsec are not implemented. Alpha.2 adds a local
+Ollama/Qwen3 assistant and SNMP switch management; see [setup](docs/AI-SWITCHES.md).
 ClamAV requires official signatures, bundled when the build-time download
 succeeds or downloaded from the UTM page. The two bundled local IPS rules
 provide limited coverage until community rules are downloaded.
@@ -23,3 +24,4 @@ provide limited coverage until community rules are downloaded.
 See [the Devuan guide](docs/DEVUAN.md) and [validation status](SOURCE_STATUS.md).
 The lab web login is `admin` / `igneus`; a fresh ISO also uses root / `igneus`.
 The `.deb` preserves existing credentials and never changes the root password.
+

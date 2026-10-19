@@ -30,7 +30,7 @@ On a machine with Python 3 and `dpkg-deb`:
 sh packaging/devuan/build-deb.sh
 ```
 
-This creates `dist/murus-igneus_0.3.0~alpha.1_all.deb`. Building the package does
+This creates `dist/murus-igneus_0.3.0~alpha.2_all.deb`. Building the package does
 not require root, a chroot, network access, or changes to the host firewall.
 The payload preserves the MIT attribution of the recovered application code
 alongside the repository's GPL-3 license file. It includes no Alpine installer,
@@ -46,7 +46,7 @@ forwarding on that VM.
 
 ```sh
 sudo apt update
-sudo apt install ./dist/murus-igneus_0.3.0~alpha.1_all.deb
+sudo apt install ./dist/murus-igneus_0.3.0~alpha.2_all.deb
 ip -br address
 sudo editor /etc/default/murus-igneus
 ```
@@ -126,7 +126,7 @@ Live-session changes are otherwise temporary.
   unavailable. Proxy-originated traffic uses its own destination ACL rather
   than forwarding policies.
 - Signature updates run as visible background jobs. Reapply the configuration
-  to reload updated signatures. AI is not implemented.
+  to reload updated signatures. A local Ollama/Qwen3 connector and SNMP switch management are included; see [setup](AI-SWITCHES.md).
 
 Real VM validation is tracked separately in `SOURCE_STATUS.md`.
 
@@ -145,3 +145,4 @@ also attempts official ClamAV updates and proxy/EICAR tests. For an offline
 network-only run, explicitly add `MURUS_SKIP_SIGNATURE_UPDATE=YES`; this skips
 antivirus verification and is reported as such. The test never selects or
 erases a disk.
+

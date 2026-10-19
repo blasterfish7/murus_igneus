@@ -1,7 +1,10 @@
 """Single asynchronous maintenance job with bounded local log. SPDX-License-Identifier: MIT."""
 from pathlib import Path
 import secrets,subprocess,threading,time
-from migration import Error
+try:
+    from .migration import Error
+except ImportError:
+    from migration import Error
 LOCK=threading.RLock();JOB=None
 
 def busy():return bool(JOB and JOB['state']=='running')
@@ -33,3 +36,4 @@ def run(args,log,data=None,timeout=1800):
     r=subprocess.run(args,input=data,text=True,stdout=log,stderr=subprocess.STDOUT,timeout=timeout)
     log.flush()
     if r.returncode:raise Error('Comando fallito: '+args[0]+' ('+str(r.returncode)+')')
+

@@ -10,18 +10,23 @@ from pathlib import Path
 import secrets
 import signal
 import ssl
+import sys
 import subprocess
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from migration import translate, baseline, Error
-from configuration import compile_config, from_backup, empty
-import security
-import installer
-import jobs
+try:
+    from .migration import VERSION, baseline, Error
+    from .configuration import compile_config, from_backup, empty
+    from . import security, installer, jobs, assistant, switches
+except ImportError:
+    from migration import VERSION, baseline, Error
+    from configuration import compile_config, from_backup, empty
+    import security, installer, jobs, assistant, switches
 
 STATE=Path('/etc/murus_igneus');MGMT=os.environ.get('MURUS_MANAGEMENT_INTERFACE','eth0');LOCK=threading.RLock()
 if not re.fullmatch(r'[A-Za-z0-9_.-]{1,15}',MGMT) or MGMT=='lo':raise ValueError('Interfaccia di gestione non valida')
+CSRF_HEADER='X-Murus-Igneus-CSRF'
 CSRF=secrets.token_urlsafe(32);PLAN=None;PENDING=None;LAST='Nessuna configurazione applicata';ACTIVE=None
 
 def run(args,data=None,check=True):
@@ -47,6 +52,7 @@ def network(ops,undo):
     for op in ops:
         dev=op['interface']
         if dev not in available or dev in ('lo',MGMT):raise Error('Scheda dati assente o riservata')
+        if op['kind']=='route' and any(ipaddress.IPv4Network(op['destination']).subnet_of(n) for n in reserved):raise Error('La rotta ricade nella rete di gestione')
         if op['kind']=='address' and any(ipaddress.IPv4Interface(op['address']).network.overlaps(n) for n in reserved):raise Error('La rete importata si sovrappone alla rete di gestione')
     for op in ops:
         dev=op['interface'];info=json.loads(run(['ip','-j','link','show','dev',dev]))[0]
@@ -115,10 +121,16 @@ def apply(plan):
     LAST='Applicata temporaneamente: confermare entro 90 secondi';return ident
 
 class Handler(BaseHTTPRequestHandler):
-    server_version='Murus-Igneus/0.3.0-alpha'
+    server_version='Murus Igneus/'+VERSION
+    timeout=15
+    def setup(self):
+        self.request.settimeout(self.timeout)
+        if isinstance(self.request,ssl.SSLSocket):self.request.do_handshake()
+        super().setup()
     def log_message(self,*_):pass
     def auth(self):
-        expected='admin:'+(STATE/'admin.password').read_text().strip()
+        try:expected='admin:'+(STATE/'admin.password').read_text().strip()
+        except OSError:self.reply(503,{'error':'Credenziali non disponibili'});return False
         try:
             h=self.headers.get('Authorization','');actual=base64.b64decode(h[6:],validate=True).decode() if h.startswith('Basic ') else ''
         except Exception:actual=''
@@ -135,29 +147,50 @@ class Handler(BaseHTTPRequestHandler):
             with LOCK:
                 if self.path=='/api/status':
                     links=json.loads(run(['ip','-j','link']))
-                    self.reply(200,{'version':'0.3.0-alpha','csrf':CSRF,'management':MGMT,'links':[x['ifname'] for x in links if x['ifname'] not in (MGMT,'lo')],'last':LAST,'maintenance':jobs.busy(),'pending':{'id':PENDING['id'],'deadline':PENDING['deadline']} if PENDING else None})
+                    self.reply(200,{'version':VERSION,'csrf':CSRF,'management':MGMT,'links':[x['ifname'] for x in links if x['ifname'] not in (MGMT,'lo')],'last':LAST,'maintenance':jobs.busy(),'pending':{'id':PENDING['id'],'deadline':PENDING['deadline'],'remaining':max(0,PENDING['deadline']-time.time())} if PENDING else None})
                 elif self.path=='/api/configuration':self.reply(200,{'configuration':ACTIVE.get('configuration') if ACTIVE else {**empty(),**security.defaults()},'legacy':bool(ACTIVE and not ACTIVE.get('configuration'))})
+                elif self.path=='/api/assistant':self.reply(200,{'settings':assistant.load(STATE),'models':assistant.MODELS,'task':assistant.TASK.status()})
+                elif self.path=='/api/switches':self.reply(200,switches.inventory(STATE))
                 elif self.path=='/api/installer':self.reply(200,installer.inventory())
                 elif self.path=='/api/security':self.reply(200,security.health())
                 elif self.path=='/api/job':self.reply(200,jobs.status())
                 elif self.path=='/api/rules':self.reply(200,{'rules':run(['nft','list','table','inet','murus_igneus'])})
                 elif self.path=='/api/logs':self.reply(200,{'logs':'\n'.join(x for x in run(['dmesg'],check=False).splitlines() if 'OW policy' in x)[-30000:]})
-                elif self.path in ('/','/app.js','/style.css'):
-                    name,mime={'/':('index.html','text/html; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8')}[self.path]
+                elif self.path in ('/','/app.js','/management.js','/style.css'):
+                    name,mime={'/':('index.html','text/html; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/management.js':('management.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8')}[self.path]
                     self.reply(200,Path(__file__).with_name(name).read_bytes(),mime)
                 else:self.reply(404,{'error':'Risorsa assente'})
         except Exception as e:self.reply(500,{'error':str(e)})
     def do_POST(self):
         global PLAN,PENDING,LAST,ACTIVE
         if not self.auth():return
-        if not hmac.compare_digest(self.headers.get('X-Murus-Igneus-CSRF',''),CSRF):return self.reply(403,{'error':'Token CSRF non valido'})
+        if not hmac.compare_digest(self.headers.get(CSRF_HEADER,'').encode('utf-8','replace'),CSRF.encode()):return self.reply(403,{'error':'Token CSRF non valido'})
         try:
             length=int(self.headers.get('Content-Length','0'))
             if not 0<length<=9*1024**2 or self.headers.get('Content-Type')!='application/json':raise Error('Richiesta non valida')
             data=json.loads(self.rfile.read(length))
+            if not isinstance(data,dict):raise Error('Richiesta non valida')
             with LOCK:
-                if self.path in ('/api/installer/preview','/api/installer/start','/api/security/update','/api/vpn/key'):
-                    if PENDING or jobs.busy():raise Error('Modifica o manutenzione in corso')
+                if self.path=='/api/assistant/settings':self.reply(200,assistant.save(STATE,data))
+                elif self.path=='/api/assistant/check':
+                    settings=assistant.load(STATE)
+                    self.reply(200,assistant.TASK.start(lambda:assistant.check(settings)))
+                elif self.path=='/api/assistant/ask':
+                    logs=''
+                    if data.get('include_logs') is True:
+                        logs='\n'.join(x for x in run(['dmesg'],check=False).splitlines() if 'OW policy' in x)[-6000:]
+                    summary=[{'name':r['name'],'host':r['host'],'telemetry':r.get('telemetry')} for r in switches.inventory(STATE)['devices']]
+                    self.reply(200,assistant.ask(STATE,data,MGMT,summary,logs))
+                elif self.path in ('/api/switches/save','/api/switches/delete','/api/switches/poll','/api/switches/port/preview','/api/switches/port/apply'):
+                    if PENDING or jobs.busy():raise Error('Modifica firewall o manutenzione in corso')
+                    if self.path=='/api/switches/save':result=switches.save(STATE,data)
+                    elif self.path=='/api/switches/delete':result=switches.delete(STATE,data.get('id'))
+                    elif self.path=='/api/switches/poll':result=switches.poll(STATE,data.get('id'))
+                    elif self.path=='/api/switches/port/preview':result=switches.preview(STATE,data)
+                    else:result=switches.apply(STATE,data)
+                    self.reply(200,result)
+                elif self.path in ('/api/installer/preview','/api/installer/start','/api/security/update','/api/vpn/key'):
+                    if PENDING or jobs.busy() or (switches.TASK.status() or {}).get('state')=='running':raise Error('Modifica o manutenzione in corso')
                     if self.path=='/api/installer/preview':self.reply(200,installer.preview(data.get('disk')))
                     elif self.path=='/api/installer/start':self.reply(200,installer.start(data))
                     elif self.path=='/api/vpn/key':self.reply(200,{'public_key':security.public_key()})
@@ -189,6 +222,21 @@ class Handler(BaseHTTPRequestHandler):
                 else:self.reply(404,{'error':'Risorsa assente'})
         except (ValueError,KeyError,TypeError,RecursionError,subprocess.TimeoutExpired) as e:self.reply(400,{'error':str(e)})
 
+        except Exception:self.reply(500,{'error':'Errore interno'})
+
+class Server(ThreadingHTTPServer):
+    daemon_threads=True
+    def handle_error(self,request,client_address):
+        # Failed handshakes and client timeouts are routine on a network-facing port; anything else is a bug.
+        if not isinstance(sys.exc_info()[1],OSError):super().handle_error(request,client_address)
+
+def make_server(host,port,cert,key):
+    ctx=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);ctx.minimum_version=ssl.TLSVersion.TLSv1_2;ctx.load_cert_chain(cert,key)
+    server=Server((host,port),Handler)
+    server.socket=ctx.wrap_socket(server.socket,server_side=True,do_handshake_on_connect=False)
+    return server
+
+
 def main():
     global LAST,ACTIVE
     STATE.mkdir(mode=0o700,exist_ok=True);STATE.chmod(0o700)
@@ -208,8 +256,7 @@ def main():
     cert,key=STATE/'server.crt',STATE/'server.key'
     if not cert.exists() or not key.exists():
         run(['openssl','req','-x509','-newkey','rsa:2048','-sha256','-nodes','-days','3650','-subj','/CN=murus_igneus.local','-keyout',str(key),'-out',str(cert)]);key.chmod(0o600)
-    server=ThreadingHTTPServer(('0.0.0.0',8443),Handler);server.daemon_threads=True;ctx=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);ctx.minimum_version=ssl.TLSVersion.TLSv1_2
-    ctx.load_cert_chain(cert,key);server.socket=ctx.wrap_socket(server.socket,server_side=True);server.serve_forever()
+    make_server('0.0.0.0',8443,cert,key).serve_forever()
 
 if __name__=='__main__':
     def terminate(signum,frame):raise SystemExit(0)
@@ -221,3 +268,4 @@ if __name__=='__main__':
             run(['nft','-f','-'],baseline(MGMT),check=False)
             run(['sysctl','-w','net.ipv4.ip_forward=0'],check=False)
             security.activate(security.defaults())
+

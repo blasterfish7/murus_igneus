@@ -5,6 +5,8 @@ import json
 import re
 import shlex
 
+VERSION='0.3.0-alpha.2'  # single runtime source; __init__.py must match (see tests/test_hardening.py)
+
 class Error(ValueError): pass
 
 @dataclass
@@ -119,29 +121,34 @@ def translate(text,mapping,management='eth0'):
                 if any(a.network.overlaps(old) for old in subnets):raise Error('Subnet sovrapposte sulle porte dati')
                 subnets.append(a.network);ops.append({'kind':'address','interface':dev,'address':str(a)})
         except (Error,ValueError) as e:blocked.append(f'Interfaccia {name}: {e}')
+    addr_memo={};svc_memo={}  # per-group results, deduplicated: nested groups stay linear instead of exponential
     def address(name,trail=()):
         if name=='all':return ['0.0.0.0/0']
         if name in trail:raise Error('Ciclo nei gruppi indirizzi')
         if name in groups:
+            if name in addr_memo:return addr_memo[name]
             n=groups[name]
             if n.children or set(n.values)-{'member','uuid','comment','color'}:raise Error('Gruppo indirizzi avanzato')
-            return [x for m in n.values.get('member',[]) for x in address(m,trail+(name,))]
+            addr_memo[name]=list(dict.fromkeys(x for m in n.values.get('member',[]) for x in address(m,trail+(name,))))
+            return addr_memo[name]
         if name not in addresses:raise Error('Indirizzo assente: '+name)
         n=addresses[name];v=n.values
         if n.children or set(v)-{'type','subnet','uuid','comment','color','associated-interface','allow-routing'} or one(v,'type','ipmask')!='ipmask':raise Error('Indirizzo avanzato non supportato: '+name)
         return [net(v.get('subnet',['0.0.0.0','0.0.0.0']))]
     def service(name,trail=()):
-        builtin={'ALL':[('all',[])],'HTTP':[('tcp',['80'])],'HTTPS':[('tcp',['443'])],'SSH':[('tcp',['22'])],'DNS':[('tcp',['53']),('udp',['53'])],'PING':[('icmp',[])],'ALL_TCP':[('tcp',[])],'ALL_UDP':[('udp',[])]}
+        builtin={'ALL':[('all',())],'HTTP':[('tcp',('80',))],'HTTPS':[('tcp',('443',))],'SSH':[('tcp',('22',))],'DNS':[('tcp',('53',)),('udp',('53',))],'PING':[('icmp',())],'ALL_TCP':[('tcp',())],'ALL_UDP':[('udp',())]}
         if name not in services and name in builtin:return builtin[name]
         if name in trail:raise Error('Ciclo nei gruppi servizi')
         if name in sgroups:
+            if name in svc_memo:return svc_memo[name]
             n=sgroups[name]
             if n.children or set(n.values)-{'member','comment','color','uuid','proxy'} or flag(n.values,'proxy'):raise Error('Gruppo servizi avanzato')
-            return [x for m in n.values.get('member',[]) for x in service(m,trail+(name,))]
+            svc_memo[name]=list(dict.fromkeys(x for m in n.values.get('member',[]) for x in service(m,trail+(name,))))
+            return svc_memo[name]
         if name not in services:raise Error('Servizio assente: '+name)
         n=services[name];v=n.values
         if n.children or set(v)-{'protocol','tcp-portrange','udp-portrange','comment','color','category'} or one(v,'protocol','TCP/UDP/SCTP') not in ('TCP/UDP/SCTP','TCP/UDP/UDP-Lite/SCTP'):raise Error('Servizio avanzato non supportato: '+name)
-        result=[(proto,ports(v[key])) for proto,key in [('tcp','tcp-portrange'),('udp','udp-portrange')] if v.get(key)]
+        result=[(proto,tuple(ports(v[key]))) for proto,key in [('tcp','tcp-portrange'),('udp','udp-portrange')] if v.get(key)]
         if not result:raise Error('Servizio senza porte supportate')
         return result
     def mapped(names):
@@ -190,4 +197,5 @@ def translate(text,mapping,management='eth0'):
             if not 1<=distance<=255 or not 0<=priority<=65535:raise Error('Metrica non valida')
             ops.append({'kind':'route','destination':net(v.get('dst',['0.0.0.0','0.0.0.0'])),'gateway':str(ip.IPv4Address(one(v,'gateway'))),'interface':mapping[dev],'metric':distance*65536+priority})
         except (Error,ValueError) as e:blocked.append(f'Rotta {ident}: {e}')
-    return {'version':'0.1.0','ready':not blocked,'blockers':blocked,'warnings':warnings,'interfaces':list(interfaces),'mapping':mapping,'network_ops':ops,'nftables':'\n'.join(lines)+'\n','counts':{'interfaces':len(interfaces),'addresses':len(addresses),'groups':len(groups),'services':len(services),'policies':count,'routes':len(routes)}}
+    return {'version':VERSION,'ready':not blocked,'blockers':blocked,'warnings':warnings,'interfaces':list(interfaces),'mapping':mapping,'network_ops':ops,'nftables':'\n'.join(lines)+'\n','counts':{'interfaces':len(interfaces),'addresses':len(addresses),'groups':len(groups),'services':len(services),'policies':count,'routes':len(routes)}}
+

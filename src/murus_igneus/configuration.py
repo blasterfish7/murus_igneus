@@ -1,7 +1,10 @@
 """Native editable Murus Igneus configuration. SPDX-License-Identifier: MIT."""
 import ipaddress as ip
 import json
-from migration import translate, parse, one, flag, net, Error
+try:
+    from .migration import translate, parse, one, flag, net, ports, Error, VERSION
+except ImportError:  # run as a script from this directory (how the service starts)
+    from migration import translate, parse, one, flag, net, ports, Error, VERSION
 
 KINDS=('interfaces','addresses','groups','services','service_groups','policies','routes')
 BUILTINS=('ALL','HTTP','HTTPS','SSH','DNS','PING','ALL_TCP','ALL_UDP')
@@ -80,9 +83,10 @@ def compile_config(config,management='eth0'):
     add('router static',routes)
     source='\n'.join(parts)+'\n';plan=translate(source,mapping,management)
     def validate_groups(items,known):
-        graph={r['name']:r['members'] for r in items}
+        graph={r['name']:r['members'] for r in items};done=set()
         def visit(name,trail):
             if name in trail:raise Error('Ciclo nei gruppi: '+name)
+            if name in done:return
             if name not in graph:
                 if name not in known:raise Error('Riferimento assente: '+name)
                 return
@@ -90,16 +94,16 @@ def compile_config(config,management='eth0'):
             if not isinstance(members,list) or not members or not all(isinstance(m,str) for m in members):raise Error('Membri del gruppo non validi: '+name)
             if len(trail)>64:raise Error('Gruppi troppo annidati')
             for m in members:visit(m,trail+(name,))
+            done.add(name)
         for name in graph:visit(name,())
     validate_groups(c['groups'],{'all'}|{r['name'] for r in c['addresses']})
     validate_groups(c['service_groups'],set(BUILTINS)|{r['name'] for r in c['services']})
-    from migration import ports
     for r in c['services']:
         ports(r.get('tcp','').split());ports(r.get('udp','').split())
     check=translate(source.replace('set status "disable"','set status "enable"'),mapping,management)
     plan['blockers']+=check['blockers']
     plan['blockers']=list(dict.fromkeys(plan['blockers']));plan['ready']=not plan['blockers']
-    plan['version']='0.2.0';plan['configuration']=c
+    plan['version']=VERSION;plan['configuration']=c
     return plan
 
 def from_backup(text,mapping,management='eth0'):
@@ -133,7 +137,10 @@ def from_backup(text,mapping,management='eth0'):
 _compile_base=compile_config
 def compile_config(config,management='eth0'):
     import copy
-    import security
+    try:
+        from . import security
+    except ImportError:
+        import security
     if not isinstance(config,dict):raise Error('Configurazione non valida')
     settings=security.validate(config,management)
     original=copy.deepcopy(config);base={k:v for k,v in original.items() if k not in ('vpn','utm')}
@@ -154,6 +161,7 @@ def compile_config(config,management='eth0'):
     if settings['vpn']['enabled']:plan['configuration']['interfaces']=[r for r in plan['configuration']['interfaces'] if r['name']!='VPN']
     plan['configuration'].update(settings);plan['security']=settings
     plan['nftables']=security.decorate(plan['nftables'],settings)
-    plan['version']='0.3.0-alpha'
+    plan['version']='0.3.0-alpha.2'
     return plan
+
 

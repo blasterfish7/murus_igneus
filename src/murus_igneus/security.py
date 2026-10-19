@@ -3,7 +3,6 @@ import base64
 import copy
 import ipaddress as ip
 import json
-import os
 from pathlib import Path
 import re
 import socket
@@ -11,7 +10,10 @@ import struct
 import subprocess
 import threading
 import time
-from migration import Error
+try:
+    from .migration import Error
+except ImportError:
+    from migration import Error
 
 STATE=Path('/etc/murus_igneus');RUN=Path('/run/murus-igneus');WG='mivpn0'
 PROCESSES={};LOGS={};PROXY=None
@@ -197,7 +199,10 @@ def antivirus_start(u):
         if clam_ping():break
         time.sleep(.5)
     else:raise Error('ClamAV: caricamento firme non completato')
-    from avproxy import create_proxy
+    try:
+        from .avproxy import create_proxy
+    except ImportError:
+        from avproxy import create_proxy
     PROXY=create_proxy(u,clam_scan);threading.Thread(target=PROXY.serve_forever,daemon=True).start()
 
 def activate(settings):
@@ -228,4 +233,5 @@ def health():
                 if a.get('event_type')=='alert':alerts.append({'time':a.get('timestamp'),'source':a.get('src_ip'),'destination':a.get('dest_ip'),'signature':a.get('alert',{}).get('signature'),'action':a.get('alert',{}).get('action')})
             except ValueError:pass
     return {'versions':versions,'vpn':command(['wg','show',WG],check=False) if Path('/sys/class/net/'+WG).exists() else 'Disabilitata','ips_running':bool(PROCESSES.get('suricata') and PROCESSES['suricata'].poll() is None),'antivirus_ready':clam_ping(),'proxy_running':PROXY is not None,'signatures':[{'name':p.name,'bytes':p.stat().st_size,'modified':p.stat().st_mtime} for p in Path('/var/lib/clamav').glob('*') if p.suffix in ('.cvd','.cld')],'alerts':alerts,'https_scanning':False}
+
 

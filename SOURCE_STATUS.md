@@ -1,4 +1,25 @@
-# Verification status — 0.3.0-alpha
+# Verification status — 0.3.0-alpha.2
+
+AI/SNMP update, 2026-10-20 (Europe/Rome). Still laboratory software.
+
+This branch adds the local Ollama/Qwen3 connector, validated AI draft proposals,
+SNMPv2c/v3 inventory, IF-MIB/LLDP polling and preview/confirmation for port up/down.
+It also reconciles the Claude TLS, CSRF, version, management-route and nested-group
+fixes with the working Devuan VPN/UTM/installer implementation. Other integration
+branches have not been overwritten or merged.
+
+94 automated tests are present, including real loopback Net-SNMP v2c and v3 SHA/AES
+protocol tests (three skip if the tools are absent). Two git-ignore tests require
+an actual git checkout. AI HTTP protocol and proposal validation use a controlled
+local fixture; separate real-model/browser verification is recorded in the PR.
+
+The previous ISO traffic and installation checks below apply to alpha.1 only.
+New builds must not inherit the old ISO hash or a claim of full runtime revalidation.
+See [setup and boundaries](docs/AI-SWITCHES.md).
+
+---
+
+# Previous delivered build — 0.3.0-alpha.1
 
 Verified 2026-10-19. Laboratory software, not a production release.
 
@@ -72,3 +93,4 @@ preserved alongside repository licensing. See docs/DEVUAN.md and docs/PROVENANCE
 tools/validate-devuan-runtime.py replaces configuration and creates namespaces:
 run it only in an explicitly flagged disposable live VM, never on a real network.
 It does not erase a disk.
+

@@ -1,8 +1,14 @@
 """Explicitly confirmed live-to-disk installer. SPDX-License-Identifier: MIT."""
-import hashlib,json,os,re,secrets,stat,subprocess,tempfile,time
+import json,re,secrets,subprocess,tempfile,time
 from pathlib import Path
-from migration import Error
-import jobs
+try:
+    from .migration import Error
+except ImportError:
+    from migration import Error
+try:
+    from . import jobs
+except ImportError:
+    import jobs
 PREVIEW=None
 
 def command(args):return subprocess.check_output(args,text=True,timeout=20)
@@ -72,4 +78,5 @@ def install(disk,log):
     finally:
         for where in reversed(mounts):
             subprocess.run(['umount','-R',where],stdout=log,stderr=subprocess.STDOUT,timeout=30)
+
 
