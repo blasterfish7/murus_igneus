@@ -42,6 +42,21 @@ bash "$project/packaging/devuan/build-deb.sh" "$out"
 cp "$out/murus-igneus_0.3.0~alpha.1_all.deb" "$root/tmp/murus.deb"
 chroot "$root" dpkg -i /tmp/murus.deb
 rm "$root/tmp/murus.deb"
+# A signed ClamAV database can be distributed with the lab ISO when its official
+# download is available. An unavailable upstream must not be reported as coverage.
+if [[ ${MURUS_FETCH_SIGNATURES:-1} == 1 ]]; then
+    chroot "$root" python3 -c "import sys;sys.path.insert(0,'/usr/lib/murus-igneus');import security;security.update_command('clamav')"
+    if timeout 300 chroot "$root" freshclam --config-file=/run/murus-igneus/freshclam.conf --stdout > "$out/clamav-build.log" 2>&1; then
+        printf 'Official ClamAV signature update succeeded during build.\n' > "$out/signature-status.txt"
+    else
+        printf 'Official ClamAV signature download unavailable. Download signatures from UTM before enabling antivirus.\n' > "$out/signature-status.txt"
+        # Do not distribute a build server's CDN cooldown state to another host.
+        rm -f "$root/var/lib/clamav/freshclam.dat" "$root/var/lib/clamav/mirrors.dat"
+    fi
+else
+    printf 'Build-time signature download explicitly skipped.\n' > "$out/signature-status.txt"
+fi
+cat "$out/signature-status.txt"
 printf 'murus\n' > "$root/etc/hostname"
 printf '127.0.0.1 localhost\n127.0.1.1 murus\n' > "$root/etc/hosts"
 cat > "$root/etc/network/interfaces" <<'NETWORK'
@@ -80,6 +95,7 @@ mkdir -p "$iso/live" "$iso/boot/grub"
 cp -L "$root"/boot/vmlinuz-* "$iso/boot/vmlinuz"
 cp -L "$root"/boot/initrd.img-* "$iso/boot/initrd"
 cp "$out/packages-devuan.tsv" "$iso/"
+cp "$out/signature-status.txt" "$iso/"
 # Do not capture pseudo filesystems, build caches, logs or per-machine secrets.
 mksquashfs "$root" "$iso/live/filesystem.squashfs" -noappend -comp xz -processors 2 -wildcards -e 'dev/*' 'proc/*' 'sys/*' 'run/*' 'tmp/*' 'var/cache/apt/archives/*' 'var/log/*'
 cat > "$iso/boot/grub/grub.cfg" <<'GRUB'
@@ -88,7 +104,7 @@ serial --unit=0 --speed=115200
 terminal_input console serial
 terminal_output console serial
 menuentry 'Murus Igneus 0.3.0-alpha / Devuan 6 (live + web installer)' {
-  linux /boot/vmlinuz boot=live net.ifnames=0 console=tty0 console=ttyS0,115200
+  linux /boot/vmlinuz boot=live ip=frommedia net.ifnames=0 console=tty0 console=ttyS0,115200
   initrd /boot/initrd
 }
 GRUB

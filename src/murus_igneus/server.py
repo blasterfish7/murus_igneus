@@ -164,7 +164,7 @@ class Handler(BaseHTTPRequestHandler):
                     else:
                         engine=data.get('engine')
                         if engine not in ('clamav','suricata'):raise Error('Motore non valido')
-                        args=['freshclam','--stdout'] if engine=='clamav' else ['suricata-update','--no-test','--no-reload']
+                        args=security.update_command(engine)
                         self.reply(200,jobs.start('Aggiornamento '+engine,lambda log:jobs.run(args,log,timeout=1800)))
                 elif self.path=='/api/preview':
                     if PENDING:raise Error('Modifica pendente')

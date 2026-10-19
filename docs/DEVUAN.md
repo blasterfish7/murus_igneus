@@ -92,7 +92,10 @@ bash tools/build-devuan-iso.sh
 ```
 
 Outputs under `dist/`: hybrid BIOS/UEFI amd64 ISO, `SHA256SUMS` and
-`packages-devuan.tsv`. GitHub Actions builds on branch pushes. Secure Boot is
+`packages-devuan.tsv`. GitHub Actions builds on branch pushes. The builder
+attempts an official ClamAV database download (five-minute limit) and records
+the outcome in `signature-status.txt`; an unavailable download does not imply
+antivirus coverage. Set `MURUS_FETCH_SIGNATURES=0` to explicitly skip it. Secure Boot is
 not provided. Management is the first NIC (`eth0`), DHCP with a
 `192.168.56.1/24` fallback. The second and third NICs are configured in the UI.
 A fresh ISO uses root / `igneus` and web admin / `igneus`.
@@ -113,6 +116,8 @@ Live-session changes are otherwise temporary.
 - Suricata: inline IPv4 forwarding inspection after policy filtering, NFQUEUE
   without bypass. If the engine stops, queued traffic is dropped. Two local HTTP
   signatures are included; download community rules for broader coverage.
+  Community rules retain their original alert/drop actions; downloading them
+  does not automatically turn every alert into a blocking rule.
 - ClamAV: explicit HTTP proxy on the selected data NIC, port 3128, client CIDR
   and destination ACLs, domain blocking, GET/HEAD downloads up to 20 MiB.
   Download official definitions before enabling it. Content is delivered only
@@ -123,3 +128,19 @@ Live-session changes are otherwise temporary.
   to reload updated signatures. AI is not implemented.
 
 Real VM validation is tracked separately in `SOURCE_STATUS.md`.
+
+## Disposable VM traffic checks
+
+With three NICs and no connection to a production LAN, run from the serial
+console of a disposable live VM:
+
+```sh
+MURUS_LAB=YES python3 tools/validate-devuan-runtime.py
+```
+
+The script creates network namespaces/veth interfaces, replaces the appliance
+configuration and checks actual forwarding, rollback, IPS and WireGuard. It
+also attempts official ClamAV updates and proxy/EICAR tests. For an offline
+network-only run, explicitly add `MURUS_SKIP_SIGNATURE_UPDATE=YES`; this skips
+antivirus verification and is reported as such. The test never selects or
+erases a disk.

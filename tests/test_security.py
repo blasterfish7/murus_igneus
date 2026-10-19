@@ -7,6 +7,19 @@ from configuration import compile_config
 from migration import Error
 BASE={'schema':1,'interfaces':[{'name':'WAN','device':'eth1','address':'192.0.2.2/24'},{'name':'LAN','device':'eth2','address':'198.51.100.1/24'}],'addresses':[],'groups':[],'services':[],'service_groups':[],'policies':[],'routes':[]}
 class SecurityTests(unittest.TestCase):
+ def test_vendor_suricata_empty_nfq_section(self):
+  import yaml
+  with patch.object(Path,'read_text',return_value='stream: {}\nnfq:\nvars: {}\n'),patch.object(Path,'mkdir'),patch.object(security,'write') as write:
+   security.suricata_config(security.defaults()['utm'])
+  rendered=write.call_args.args[1]
+  self.assertTrue(rendered.startswith('%YAML 1.1\n---\n'))
+  self.assertEqual(yaml.safe_load(rendered)['nfq']['mode'],'accept')
+ def test_remote_peer_cannot_claim_management_subnet(self):
+  import server
+  c=security.defaults();c['vpn']['enabled']=True;c['vpn']['peers']=[{'allowed_ips':['192.168.56.7/32']}]
+  addresses=[{'addr_info':[{'local':'192.168.56.1','prefixlen':24}]}]
+  with patch.object(server,'run',return_value=json.dumps(addresses)):
+   with self.assertRaises(Error):server.check_vpn_management(c)
  def test_disabled_features_allow_different_management_port(self):
   self.assertTrue(compile_config({'schema':1},management='eth1')['ready'])
  def test_peer_cannot_claim_server_address(self):

@@ -94,25 +94,34 @@ def public_key():
     return command(['wg','pubkey'],path.read_text()).strip()
 
 def vpn_start(v):
-    command(['ip','link','del',WG],check=False)
-    if not v['enabled']:return
+    if not v['enabled']:
+        command(['ip','link','del',WG],check=False);return
     command(['modprobe','wireguard']);public_key();RUN.mkdir(exist_ok=True)
-    command(['ip','link','add',WG,'type','wireguard'])
+    created=not Path('/sys/class/net/'+WG).exists()
+    if created:command(['ip','link','add',WG,'type','wireguard'])
     try:
         text='[Interface]\nPrivateKey = '+(STATE/'wireguard.key').read_text().strip()+'\nListenPort = '+str(v['port'])+'\n'
         for p in v['peers']:
             text+='\n[Peer]\nPublicKey = '+p['public_key']+'\nAllowedIPs = '+', '.join(p['allowed_ips'])+'\nPersistentKeepalive = '+str(p['keepalive'])+'\n'
             if p.get('endpoint'):text+='Endpoint = '+p['endpoint']+'\n'
         path=RUN/'wireguard.conf';write(path,text)
-        try:command(['wg','setconf',WG,str(path)])
+        # syncconf preserves current handshakes when a firewall-only edit is applied.
+        try:command(['wg','syncconf',WG,str(path)])
         finally:path.unlink(missing_ok=True)
-        command(['ip','addr','add',v['address'],'dev',WG]);command(['ip','link','set',WG,'mtu','1420','up'])
+        addresses=json.loads(command(['ip','-j','-4','addr','show','dev',WG]))
+        current={a['local']+'/'+str(a['prefixlen']) for row in addresses for a in row.get('addr_info',[])}
+        for old in current-{v['address']}:command(['ip','addr','del',old,'dev',WG])
+        if v['address'] not in current:command(['ip','addr','add',v['address'],'dev',WG])
+        command(['ip','link','set',WG,'mtu','1420','up'])
         local=ip.IPv4Interface(v['address']).network
-        for p in v['peers']:
-            for n in p['allowed_ips']:
-                if not ip.IPv4Network(n).subnet_of(local):command(['ip','route','add',n,'dev',WG,'metric','50'])
+        wanted={n for p in v['peers'] for n in p['allowed_ips'] if not ip.IPv4Network(n).subnet_of(local)}
+        routes=json.loads(command(['ip','-j','-4','route','show','dev',WG]))
+        existing={str(ip.IPv4Network(r['dst'],strict=False)) for r in routes if r.get('protocol')!='kernel' and r.get('metric')==50}
+        for n in existing-wanted:command(['ip','route','del',n,'dev',WG,'metric','50'])
+        for n in wanted-existing:command(['ip','route','add',n,'dev',WG,'metric','50'])
     except Exception:
-        command(['ip','link','del',WG],check=False);raise
+        if created:command(['ip','link','del',WG],check=False)
+        raise
 
 def stop(name):
     p=PROCESSES.pop(name,None)
@@ -138,8 +147,8 @@ def suricata_config(u):
     c['stats']={'enabled':False};c['default-log-dir']='/var/log/murus-suricata'
     c['outputs']=[{'eve-log':{'enabled':True,'filetype':'regular','filename':'eve.json','types':['alert','drop']}}]
     c['run-as']={'user':'root','group':'root'}
-    c.setdefault('nfq',{})['mode']='accept';c['unix-command']={'enabled':False}
-    path=RUN/'suricata.yaml';write(path,json.dumps(c),0o600);Path(c['default-log-dir']).mkdir(exist_ok=True)
+    c['nfq']=c.get('nfq') or {};c['nfq']['mode']='accept';c['unix-command']={'enabled':False}
+    path=RUN/'suricata.yaml';write(path,'%YAML 1.1\n---\n'+json.dumps(c),0o600);Path(c['default-log-dir']).mkdir(exist_ok=True)
     return path
 
 def ips_start(u):
@@ -147,7 +156,7 @@ def ips_start(u):
     if not u['ips']:return
     for mod in ('nfnetlink_queue','nft_queue'):command(['modprobe',mod])
     path=suricata_config(u);command(['suricata','-T','-c',str(path)],timeout=180)
-    spawn('suricata',['suricata','-c',str(path),'-q','0','--runmode','single'])
+    spawn('suricata',['suricata','-c',str(path),'-q','0'])
     for _ in range(100):
         p=PROCESSES['suricata']
         if p.poll() is not None:raise Error('Suricata non avviato: '+(RUN/'suricata.log').read_text()[-1500:])
@@ -177,7 +186,7 @@ def antivirus_start(u):
     stop('clamd')
     if not u['proxy']:return
     db=Path('/var/lib/clamav')
-    if not any(db.glob('*.cvd')) and not any(db.glob('*.cld')):raise Error('Scaricare prima le firme ufficiali ClamAV dalla pagina UTM')
+    if not all(any((db/(name+suffix)).is_file() for suffix in ('.cvd','.cld')) for name in ('main','daily')):raise Error('Scaricare prima le firme ufficiali ClamAV complete (main e daily) dalla pagina UTM')
     (RUN/'clamd.sock').unlink(missing_ok=True)
     # Private local socket; network clients can only access the controlled HTTP proxy.
     conf='LocalSocket '+str(RUN/'clamd.sock')+'\nLocalSocketMode 600\nDatabaseDirectory /var/lib/clamav\nForeground yes\nMaxThreads 2\nMaxQueue 8\nStreamMaxLength 20M\nMaxFileSize 20M\nMaxScanSize 40M\nAlertExceedsMax yes\nAlertEncrypted yes\n'
@@ -193,6 +202,16 @@ def antivirus_start(u):
 def activate(settings):
     RUN.mkdir(mode=0o700,exist_ok=True);RUN.chmod(0o700)
     vpn_start(settings['vpn']);ips_start(settings['utm']);antivirus_start(settings['utm'])
+
+def update_command(engine):
+    if engine=='suricata':return ['suricata-update','--no-test','--no-reload']
+    if engine!='clamav':raise Error('Motore non valido')
+    RUN.mkdir(mode=0o700,exist_ok=True)
+    # The live image has empty logs. Avoid the distribution config's missing
+    # UpdateLogFile; job output is already captured in the maintenance log.
+    path=RUN/'freshclam.conf'
+    write(path,'DatabaseDirectory /var/lib/clamav\nDatabaseOwner clamav\nDatabaseMirror database.clamav.net\nDNSDatabaseInfo current.cvd.clamav.net\n')
+    return ['freshclam','--config-file='+str(path),'--stdout']
 
 def health():
     versions={}

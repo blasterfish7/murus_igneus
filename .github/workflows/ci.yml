@@ -12,6 +12,8 @@ jobs:
           python-version: '3.13'
       - name: Python syntax
         run: python -m compileall -q src/murus_igneus
+      - name: Install configuration parser used by Devuan
+        run: python -m pip install PyYAML==6.0.2
       - name: Migration regression tests
         run: python -m unittest discover -s tests -p 'test_*.py' -v
       - name: Shell and JavaScript syntax
@@ -48,5 +50,8 @@ jobs:
             dist/*.iso
             dist/SHA256SUMS
             dist/packages-devuan.tsv
+            dist/signature-status.txt
+            dist/clamav-build.log
           compression-level: 0
           retention-days: 14
+
