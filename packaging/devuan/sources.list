@@ -1,0 +1,4 @@
+# Devuan 6 Excalibur: free software only, with signed APT metadata.
+deb http://deb.devuan.org/merged excalibur main
+deb http://deb.devuan.org/merged excalibur-updates main
+deb http://deb.devuan.org/merged excalibur-security main

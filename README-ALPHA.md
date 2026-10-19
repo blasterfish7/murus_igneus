@@ -1,13 +1,18 @@
 # Murus Igneus 0.3.0-alpha
 
-Experimental open-source Linux firewall project targeting Devuan 6 Excalibur and OpenRC.
+Experimental open-source IPv4 firewall targeting **Devuan 6 Excalibur / OpenRC**.
 
-## Actual status
+The recovered application source is committed under `src/murus_igneus/`.
+It provides a native configuration editor and conservative import of a subset
+of text FortiGate backups. IPv4 policies, static routing, SNAT and rollback come
+from the original OpenWall laboratory prototype; they require renewed runtime
+verification after migration and rebranding.
 
-- A source recovery and rebranding of the OpenWall 0.2 prototype exists as a development ZIP, but is not yet fully committed to this GitHub branch.
-- The original IPv4 firewall, static routing, NAT, configuration import and web interface need VM regression testing after migration.
-- The Devuan bootable ISO has **not** yet been built or tested.
-- AI, UTM/Suricata/ClamAV and VPN are **planned**, not implemented in this alpha.
-- The development build uses a publicly known laboratory password and is unsafe for production.
+A `.deb` build and native OpenRC service are now provided in `packaging/devuan/`.
+See [docs/DEVUAN.md](docs/DEVUAN.md). The package targets an already installed
+Devuan laboratory VM and is not started automatically during installation.
 
-Do not expose management interfaces to the Internet or deploy this software as a production firewall. License attribution for recovered MIT application files must be preserved alongside repository license notices.
+**No Devuan bootable ISO has been built or validated.** A web disk installer,
+VPN, UTM/Suricata/ClamAV and AI are planned and not implemented in this alpha.
+The known lab password is not suitable for exposed or production deployments.
+Original MIT application attribution is preserved alongside repository notices.

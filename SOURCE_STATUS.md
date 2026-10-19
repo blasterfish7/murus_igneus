@@ -1,9 +1,18 @@
 # Source status — 0.3.0-alpha
 
-**WARNING: THESE SOURCES MAY BE INCOMPLETE.**
+The development branch contains recovered/rebranded OpenWall application files
+and translator tests. The complete original build/integration environment is
+not reproduced here. Original MIT notices are preserved in the application
+source alongside the repository's GPL-3 license.
 
-The development source archive is based on an extraction of the OpenWall 0.2.0 application from a bootable ISO. This is not guaranteed to reproduce the complete original development repository: build scripts, integration tests, assets and installation infrastructure may be missing.
+New Devuan support consists of a buildable `.deb`, an OpenRC service, management
+interface configuration and packaging/HTTP regression checks. The target is
+Devuan 6 Excalibur using signed `main` packages only. This is not a statement
+that an installed Devuan appliance has passed VM/boot/runtime validation.
 
-The migration to Devuan 6 Excalibur is ongoing. A bootable Devuan ISO has not been created or verified. WireGuard VPN, Suricata IPS/IDS, ClamAV UTM and AI are planned functionality, **not yet implemented or validated**.
+No Devuan bootable ISO, web disk installer, VPN, UTM or AI is implemented or
+validated by this branch. In particular, antivirus packages alone do not scan
+transit traffic. The initial lab credential is `admin` / `igneus`; existing web
+credentials and the Devuan console/root password are preserved.
 
-No production use is supported. The known lab credential `igneus` must not be used on an exposed device. Third-party license and provenance review is pending.
+See `docs/DEVUAN.md` for exact build, installation, checks and remaining work.

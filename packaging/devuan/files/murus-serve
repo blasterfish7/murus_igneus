@@ -1,0 +1,7 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+set -eu
+set -a
+. /etc/default/murus-igneus
+set +a
+exec /usr/bin/python3 /usr/lib/murus-igneus/server.py

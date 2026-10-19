@@ -5,6 +5,7 @@ import hmac
 import ipaddress
 import json
 import os
+import re
 from pathlib import Path
 import secrets
 import ssl
@@ -15,7 +16,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from migration import translate, baseline, Error
 from configuration import compile_config, from_backup, empty
 
-STATE=Path('/etc/murus_igneus');MGMT='eth0';LOCK=threading.RLock()
+STATE=Path('/etc/murus_igneus');MGMT=os.environ.get('MURUS_MANAGEMENT_INTERFACE','eth0');LOCK=threading.RLock()
+if not re.fullmatch(r'[A-Za-z0-9_.-]{1,15}',MGMT) or MGMT=='lo':raise ValueError('Interfaccia di gestione non valida')
 CSRF=secrets.token_urlsafe(32);PLAN=None;PENDING=None;LAST='Nessuna configurazione applicata';ACTIVE=None
 
 def run(args,data=None,check=True):
@@ -92,7 +94,7 @@ def apply(plan):
     LAST='Applicata temporaneamente: confermare entro 90 secondi';return ident
 
 class Handler(BaseHTTPRequestHandler):
-    server_version='Murus Igneus/0.2'
+    server_version='Murus-Igneus/0.3.0-alpha'
     def log_message(self,*_):pass
     def auth(self):
         expected='admin:'+(STATE/'admin.password').read_text().strip()
@@ -112,7 +114,7 @@ class Handler(BaseHTTPRequestHandler):
             with LOCK:
                 if self.path=='/api/status':
                     links=json.loads(run(['ip','-j','link']))
-                    self.reply(200,{'version':'0.2.0','csrf':CSRF,'management':MGMT,'links':[x['ifname'] for x in links if x['ifname'] not in (MGMT,'lo')],'last':LAST,'pending':{'id':PENDING['id'],'deadline':PENDING['deadline']} if PENDING else None})
+                    self.reply(200,{'version':'0.3.0-alpha','csrf':CSRF,'management':MGMT,'links':[x['ifname'] for x in links if x['ifname'] not in (MGMT,'lo')],'last':LAST,'pending':{'id':PENDING['id'],'deadline':PENDING['deadline']} if PENDING else None})
                 elif self.path=='/api/configuration':self.reply(200,{'configuration':ACTIVE.get('configuration') if ACTIVE else empty(),'legacy':bool(ACTIVE and not ACTIVE.get('configuration'))})
                 elif self.path=='/api/rules':self.reply(200,{'rules':run(['nft','list','table','inet','murus_igneus'])})
                 elif self.path=='/api/logs':self.reply(200,{'logs':'\n'.join(x for x in run(['dmesg'],check=False).splitlines() if 'OW policy' in x)[-30000:]})
@@ -124,7 +126,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         global PLAN,PENDING,LAST,ACTIVE
         if not self.auth():return
-        if not hmac.compare_digest(self.headers.get('X-Murus Igneus-CSRF',''),CSRF):return self.reply(403,{'error':'Token CSRF non valido'})
+        if not hmac.compare_digest(self.headers.get('X-Murus-Igneus-CSRF',''),CSRF):return self.reply(403,{'error':'Token CSRF non valido'})
         try:
             length=int(self.headers.get('Content-Length','0'))
             if not 0<length<=9*1024**2 or self.headers.get('Content-Type')!='application/json':raise Error('Richiesta non valida')
