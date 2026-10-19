@@ -173,7 +173,8 @@ def ask(state, data, management, switch_summary=None, logs=''):
             except (KeyError, TypeError, ValueError):
                 raise ValueError('Risposta del modello non valida; nessuna modifica eseguita') from None
             output = {'answer': response['answer'][:24000], 'proposal': None,
-                      'model': settings['model'], 'applied': False}
+                      'model': settings['model'], 'applied': False,
+                      'facts': {**context['draft_summary'], 'default_forward': 'drop'}}
             proposal = response.get('configuration')
             if proposal is not None and allow_proposal:
                 try:

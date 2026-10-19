@@ -34,7 +34,10 @@ Nella pagina AI:
    applica**, applicarla e confermarla entro il tempo previsto.
 
 L'AI non esegue shell, non applica policy, non gestisce direttamente gli switch
-e non sostituisce IPS/antivirus. Risposte e proposte possono essere errate.
+e non sostituisce IPS/antivirus. Risposte e proposte possono essere errate. La GUI affianca un riepilogo della
+bozza calcolato dal motore, indipendente dal modello. I test con il modello
+piccolo hanno mostrato anche interpretazioni errate: confrontare sempre
+la risposta con tale riepilogo e con la configurazione.
 Non esiste una chat persistente: ogni domanda ha il proprio contesto; nessuna
 cronologia viene scritta su disco da Murus. L'eventuale registrazione sul server
 Ollama dipende dalla sua configurazione. Nomi di dispositivi, descrizioni e log

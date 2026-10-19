@@ -160,7 +160,9 @@
         else if (aiKind === 'check') el('ai-connection').textContent = task.result.message;
         else {
           el('ai-state').textContent = 'Risposta AI: controlla le indicazioni prima di usarle. Nessuna modifica applicata.';
-          el('ai-answer').textContent = task.result.answer || task.result.message || '';
+          const f = task.result.facts;
+          const facts = f ? `Dati della bozza verificati dal motore: ${f.policy_count} policy; transito senza corrispondenza bloccato; VPN ${f.vpn_enabled ? 'abilitata' : 'disabilitata'}; IPS ${f.ips_enabled ? 'abilitato' : 'disabilitato'}; antivirus HTTP ${f.http_antivirus_enabled ? 'abilitato' : 'disabilitato'}; antivirus HTTPS non disponibile.\n\nRisposta AI (può contenere errori):\n` : '';
+          el('ai-answer').textContent = facts + (task.result.answer || task.result.message || '');
           aiProposal = task.result.proposal;
           if (task.result.proposal_errors) el('ai-answer').textContent += '\n\nProposta rifiutata:\n' + task.result.proposal_errors.join('\n');
           el('ai-proposal-panel').hidden = !aiProposal;

@@ -113,7 +113,9 @@ class AssistantTests(unittest.TestCase):
         self.assertEqual(wait(assistant.TASK)['state'], 'failed')
     def test_inactive_ips_rules_do_not_appear_as_active_protection(self):
         assistant.ask(self.temp.name, {'question': 'Analizza', 'configuration': empty()}, 'eth0')
-        wait(assistant.TASK)
+        result = wait(assistant.TASK)['result']
+        self.assertEqual(result['facts']['default_forward'], 'drop')
+        self.assertFalse(result['facts']['ips_enabled'])
         context = OllamaStub.calls[0]['messages'][1]['content']
         self.assertIn('"ips_enabled": false', context)
         self.assertNotIn('Shellshock', context)
