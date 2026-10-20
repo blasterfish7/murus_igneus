@@ -8,6 +8,6 @@ Experimental open-source Linux firewall project targeting Devuan 6 Excalibur and
 - The original IPv4 firewall, static routing, NAT, configuration import and web interface need VM regression testing after migration.
 - The Devuan bootable ISO has **not** yet been built or tested.
 - AI, UTM/Suricata/ClamAV and VPN are **planned**, not implemented in this alpha.
-- The development build uses a publicly known laboratory password and is unsafe for production.
+- Earlier development builds used a publicly known laboratory password (`igneus`); current builds generate a random admin password at first start (see `SECURITY.md`). The software is still unsafe for production.
 
 Do not expose management interfaces to the Internet or deploy this software as a production firewall. License attribution for recovered MIT application files must be preserved alongside repository license notices.

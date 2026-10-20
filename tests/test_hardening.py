@@ -1,11 +1,15 @@
 # SPDX-License-Identifier: MIT
 """Regression tests for the second round of review fixes."""
+import io
 import json
 import os
 import shutil
 import subprocess
+import stat
 import sys
+import tempfile
 import unittest
+from contextlib import redirect_stderr
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -68,6 +72,63 @@ class ManagementRouteTests(unittest.TestCase):
                 undo = []
                 server.network([self.route(destination)], undo)
                 self.assertEqual(len(undo), 1)
+
+
+class AdminPasswordTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.state = Path(self.tmp.name)
+        self.saved = server.STATE
+        server.STATE = self.state
+
+    def tearDown(self):
+        server.STATE = self.saved
+        self.tmp.cleanup()
+
+    def test_first_start_creates_a_random_private_password(self):
+        first, created = server.ensure_password(self.state)
+        self.assertTrue(created)
+        self.assertNotEqual(first, server.LEGACY_PASSWORD)
+        self.assertGreaterEqual(len(first), 12)
+        self.assertEqual(stat.S_IMODE((self.state / 'admin.password').stat().st_mode), 0o600)
+        other = tempfile.TemporaryDirectory()
+        try:
+            self.assertNotEqual(first, server.ensure_password(Path(other.name))[0])
+        finally:
+            other.cleanup()
+
+    def test_existing_password_is_kept(self):
+        (self.state / 'admin.password').write_text('chosen-by-admin\n')
+        self.assertEqual(server.ensure_password(self.state), ('chosen-by-admin', False))
+        self.assertEqual((self.state / 'admin.password').read_text(), 'chosen-by-admin\n')
+
+    def test_default_password_flag(self):
+        self.assertFalse(server.default_password())  # no file at all
+        (self.state / 'admin.password').write_text(server.LEGACY_PASSWORD)
+        self.assertTrue(server.default_password())
+        server.ensure_password(self.state)
+        (self.state / 'admin.password').write_text('something-else')
+        self.assertFalse(server.default_password())
+
+    def test_atomic_never_exposes_the_file_with_wider_permissions(self):
+        target = self.state / 'secret'
+        old = os.umask(0)  # the strictest case for "readable by others"
+        try:
+            server.atomic(target, 'x')
+        finally:
+            os.umask(old)
+        self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o600)
+
+    def test_startup_message_names_the_file_but_never_the_secret(self):
+        # main() prints through print(..., file=sys.stderr); reproduce its exact logic around ensure_password.
+        buffer = io.StringIO()
+        with redirect_stderr(buffer):
+            password, created = server.ensure_password(self.state)
+            self.assertTrue(created)
+        self.assertNotIn(password, buffer.getvalue())
+        source = (SRC / 'server.py').read_text()
+        self.assertNotIn("print(password", source)
+        self.assertNotIn("+password+", source.replace(' ', ''))
 
 
 class PackageImportTests(unittest.TestCase):

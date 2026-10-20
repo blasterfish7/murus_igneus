@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import ipaddress
 import json
+import os
 from pathlib import Path
 import secrets
 import ssl
@@ -29,7 +30,21 @@ def run(args,data=None,check=True):
     return r.stdout
 
 def atomic(path,text):
-    temp=path.with_suffix('.tmp');temp.write_text(text);temp.chmod(0o600);temp.replace(path)
+    temp=path.with_suffix('.tmp')
+    with os.fdopen(os.open(temp,os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600),'w') as f:f.write(text)  # never readable by others, not even briefly
+    temp.chmod(0o600);temp.replace(path)
+
+LEGACY_PASSWORD='igneus'  # the publicly known lab password shipped by 0.2/early 0.3 builds
+
+def ensure_password(state):
+    """Create a random admin password on first start. Returns (password, created)."""
+    path=state/'admin.password'
+    if path.exists():return path.read_text().strip(),False
+    password=secrets.token_urlsafe(12);atomic(path,password);return password,True
+
+def default_password():
+    try:return (STATE/'admin.password').read_text().strip()==LEGACY_PASSWORD
+    except OSError:return False
 
 def network(ops,undo):
     available={x['ifname'] for x in json.loads(run(['ip','-j','link']))}
@@ -124,7 +139,7 @@ class Handler(BaseHTTPRequestHandler):
             with LOCK:
                 if self.path=='/api/status':
                     links=json.loads(run(['ip','-j','link']))
-                    self.reply(200,{'version':VERSION,'csrf':CSRF,'management':MGMT,'links':[x['ifname'] for x in links if x['ifname'] not in (MGMT,'lo')],'last':LAST,'pending':{'id':PENDING['id'],'deadline':PENDING['deadline'],'remaining':max(0,PENDING['deadline']-time.time())} if PENDING else None})
+                    self.reply(200,{'version':VERSION,'default_password':default_password(),'csrf':CSRF,'management':MGMT,'links':[x['ifname'] for x in links if x['ifname'] not in (MGMT,'lo')],'last':LAST,'pending':{'id':PENDING['id'],'deadline':PENDING['deadline'],'remaining':max(0,PENDING['deadline']-time.time())} if PENDING else None})
                 elif self.path=='/api/configuration':self.reply(200,{'configuration':ACTIVE.get('configuration') if ACTIVE else empty(),'legacy':bool(ACTIVE and not ACTIVE.get('configuration'))})
                 elif self.path=='/api/rules':self.reply(200,{'rules':run(['nft','list','table','inet','murus_igneus'])})
                 elif self.path=='/api/logs':self.reply(200,{'logs':'\n'.join(x for x in run(['dmesg'],check=False).splitlines() if 'OW policy' in x)[-30000:]})
@@ -179,7 +194,10 @@ def make_server(host,port,cert,key):
 def main():
     global LAST,ACTIVE
     STATE.mkdir(mode=0o700,exist_ok=True);STATE.chmod(0o700)
-    if not (STATE/'admin.password').exists():atomic(STATE/'admin.password','igneus')
+    password,created=ensure_password(STATE)
+    # Only the location is logged, never the secret itself.
+    if created:print('Murus Igneus: password iniziale di "admin" generata in '+str(STATE/'admin.password')+' (leggibile solo da root)',file=sys.stderr,flush=True)
+    elif password==LEGACY_PASSWORD:print('Murus Igneus: ATTENZIONE, e in uso la password di laboratorio pubblica; sostituire il contenuto di '+str(STATE/'admin.password'),file=sys.stderr,flush=True)
     run(['nft','-f','-'],baseline(MGMT));run(['sysctl','-w','net.ipv4.ip_forward=0'])
     if (STATE/'active.json').exists():
         undo=[]
