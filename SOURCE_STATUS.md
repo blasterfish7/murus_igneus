@@ -18,6 +18,27 @@ Reproduced regressions and fixes:
   antivirus proxy requires a full response body for each proxied download.
 - Use the runtime VERSION constant in the security-aware configuration compiler.
 
+Validation of source commit `f7517ea456a751c0e0e7e08675d56c5de5903349`:
+[Actions run 39407442852](https://github.com/blasterfish7/murus_igneus/actions/runs/39407442852)
+completed successfully: both test and ISO jobs passed. The test job passed all
+101 Python tests without skips, including actual Net-SNMP v2c/v3
+agent reads and wrong-credential rejection. The Node.js AI UI regressions,
+Python lint, syntax checks and native package build passed. Locally, 98 Python
+tests passed and 3 SNMP tests were skipped because the client/agent tools were
+absent. The final local package was compared byte-for-byte against all packaged
+application source files.
+
+The final run produced both alpha.3 artifacts:
+
+- `murus-igneus-devuan-alpha`, artifact `12257532533`, containing the native
+  `murus-igneus_0.3.0~alpha.3_all.deb` package.
+- `murus-igneus-devuan-iso`, artifact `12257179355`, containing the ISO,
+  `SHA256SUMS`, package manifest and signature/build logs. ISO generation and
+  upload succeeded; official ClamAV signature update succeeded during build.
+
+These are GitHub Actions artifacts with 14-day retention, not a new GitHub
+Release. The alpha.2 prerelease and its tag/binaries were not replaced.
+
 Regression coverage includes actual local management/proxy HTTP requests,
 deterministic SNMP lost-reply simulations and a Node.js simulated-DOM regression
 for AI draft ownership. These are not physical-switch or real-model accuracy
