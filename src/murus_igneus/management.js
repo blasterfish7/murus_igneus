@@ -63,7 +63,12 @@
   async function openAI() {
     const data = await api('assistant'); aiSettings(data); show('assistant-page');
     if (data.task?.state === 'running') {
-      aiJob = data.task.id; aiKind = 'ask'; el('ai-state').textContent = 'Elaborazione in corso…';
+      if (aiJob !== data.task.id) {
+        // Another tab (or a reload) has no verifiable copy of the submitted draft.
+        aiDraft = null; aiProposal = null; el('ai-proposal-panel').hidden = true;
+        aiKind = 'ask';
+      }
+      aiJob = data.task.id; el('ai-state').textContent = 'Elaborazione in corso…';
     }
   }
   el('nav').append(button('Assistente AI', () => openAI().catch(error)), button('Switch locali', () => { show('switches-page'); refreshSwitches().catch(error); }));
@@ -171,7 +176,8 @@
           const f = task.result.facts;
           const facts = f ? `Dati della bozza verificati dal motore: ${f.policy_count} policy; transito senza corrispondenza bloccato; VPN ${f.vpn_enabled ? 'abilitata' : 'disabilitata'}; IPS ${f.ips_enabled ? 'abilitato' : 'disabilitato'}; antivirus HTTP ${f.http_antivirus_enabled ? 'abilitato' : 'disabilitato'}; antivirus HTTPS non disponibile.\n\nRisposta AI (può contenere errori):\n` : '';
           el('ai-answer').textContent = facts + (task.result.answer || task.result.message || '');
-          aiProposal = task.result.proposal;
+          aiProposal = aiDraft === null ? null : task.result.proposal;
+          if (task.result.proposal && aiDraft === null) el('ai-answer').textContent += '\n\nProposta di un’altra sessione: ripeti la domanda da questa bozza per caricarla.';
           if (task.result.proposal_errors) el('ai-answer').textContent += '\n\nProposta rifiutata:\n' + task.result.proposal_errors.join('\n');
           el('ai-proposal-panel').hidden = !aiProposal;
           if (aiProposal) el('ai-proposal').textContent = JSON.stringify(aiProposal, null, 2);

@@ -10,21 +10,22 @@ function harness() {
     return elements.get(id);
   };
   let task = null, fail = false, calls = 0, progress;
+  const nav = new Map();
   const draft = { schema: 1, marker: 'original' };
   const context = vm.createContext({
     document: { querySelector: () => el('main'), createElement: () => ({ append() {}, hidden: true }), body: { append() {} } },
-    el, Option: function() {}, button: () => ({}), text: () => ({}),
+    el, Option: function() {}, button: (label, fn) => { nav.set(label, fn); return {}; }, text: () => ({}),
     config: draft, pending: null, structuredClone, confirm: () => true,
     invalidate() {}, show() {}, error() {},
     setInterval: fn => { progress = fn; },
     api: async (path, data) => {
       if (path === 'assistant/ask') { calls++; if (fail) throw Error('Busy'); return { id: 'job1' }; }
-      if (path === 'assistant') return { task };
+      if (path === 'assistant') return { task, settings: { enabled: true, endpoint: 'http://127.0.0.1:11434', model: 'qwen3:4b' }, models: ['qwen3:4b'] };
       throw Error('Unexpected request ' + path);
     }
   });
   vm.runInContext(fs.readFileSync('src/murus_igneus/management.js', 'utf8'), context);
-  return { el, context, progress: () => progress(), setTask: t => { task = t; }, fail: () => { fail = true; }, calls: () => calls };
+  return { el, context, openAI: () => nav.get('Assistente AI')(), progress: () => progress(), setTask: t => { task = t; }, fail: () => { fail = true; }, calls: () => calls };
 }
 const submit = h => h.el('ai-question-form').onsubmit({ preventDefault() {} });
 (async () => {
@@ -49,6 +50,17 @@ const submit = h => h.el('ai-question-form').onsubmit({ preventDefault() {} });
   const doubleClick = harness();
   await Promise.all([submit(doubleClick), submit(doubleClick)]);
   assert.equal(doubleClick.calls(), 1, 'Concurrent submissions created duplicate jobs');
+
+  const recovered = harness();
+  await submit(recovered);
+  recovered.setTask({ id: 'job1', state: 'succeeded', result: { answer: 'Done', proposal: null } });
+  await recovered.progress();
+  recovered.setTask({ id: 'remote-job', state: 'running' });
+  await recovered.openAI(); // No original draft exists in this tab for this task.
+  recovered.setTask({ id: 'remote-job', state: 'succeeded', result: { answer: 'Remote', proposal: { schema: 1, marker: 'unrelated remote draft' } } });
+  await recovered.progress();
+  recovered.el('ai-use-proposal').onclick();
+  assert.equal(recovered.context.config.marker, 'original', 'A recovered task reused another task draft identity');
 
   const mismatch = harness();
   await submit(mismatch);
