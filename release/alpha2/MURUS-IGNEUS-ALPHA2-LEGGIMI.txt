@@ -1,0 +1,89 @@
+MURUS IGNEUS 0.3.0-alpha.2 — Devuan 6 Excalibur amd64
+
+Versione sperimentale da laboratorio, con codice originale e componenti open source.
+Nessun codice o firmware Fortinet riutilizzato. Per PC/VM x86_64.
+
+AVVIO E INSTALLAZIONE
+Avvia la ISO. L'interfaccia di gestione eth0 richiede un indirizzo via DHCP;
+se non lo riceve viene usato 192.168.56.1/24.
+Apri https://IP-gestione:8443 e accetta il certificato locale autofirmato.
+GUI: admin / igneus. Console: root / igneus.
+Puoi configurare da zero: l'importazione del backup FortiGate è facoltativa.
+L'installer web è in «Installa su disco»: richiede un disco vuoto/non montato
+almeno 8 GiB e la conferma testuale del disco da cancellare. Dopo il completamento,
+spegni la VM, rimuovi la ISO e riavvia dal disco.
+Le modifiche della sessione live si perdono se non installi.
+
+ASSISTENTE AI
+Apri «Assistente AI». Il connettore è integrato, ma Ollama e i pesi del modello
+non sono inclusi nella ISO e vanno installati separatamente sul firewall oppure
+su un server fidato della LAN. Non occorre un servizio cloud.
+Sul server Ollama installa un modello ufficiale, per esempio:
+  ollama pull qwen3:4b
+Avvia Ollama in modalità solo locale con OLLAMA_NO_CLOUD=1.
+Per un server LAN, limita l'API di gestione al solo firewall e usa una rete fidata.
+Nella GUI inserisci http://IP-server-AI:11434, salva e verifica il modello,
+quindi abilita l'assistente e salva.
+La domanda usa la bozza corrente e la telemetria degli switch; i log sono facoltativi.
+Per una proposta di configurazione, seleziona l'apposita casella. Le proposte possono richiedere alcuni minuti su CPU. Le proposte
+valide possono essere caricate nella bozza, poi verificate/applicate/confermate.
+L'AI non esegue comandi e non applica cambiamenti. Può interpretare male i dati:
+confronta la risposta con il riepilogo della bozza calcolato dal motore.
+
+SWITCH LOCALI
+Apri «Switch locali», aggiungi nome, IPv4 privato e credenziali SNMP già
+configurate sullo switch. Sono supportati SNMPv2c e SNMPv3 authPriv SHA/AES.
+«Leggi stato» acquisisce porte IF-MIB, stato link, contatori e vicini LLDP se esposti.
+La rete di gestione dello switch deve essere raggiungibile e le ACL devono
+consentire SNMP dall'indirizzo sorgente effettivo del firewall.
+La scrittura è disabilitata per impostazione predefinita. Prima di abilitarla,
+proteggi gli indici IF-MIB delle porte di gestione, uplink e aggregazioni.
+I comandi up/down richiedono anteprima e conferma testuale; non hanno rollback
+automatico. La persistenza al riavvio dipende dallo switch.
+Non sono ancora gestiti VLAN, trunk, LAG, PoE, firmware o adozione FortiLink.
+Le prove automatiche usano un agente SNMP locale; compatibilità e comandi sui
+singoli modelli fisici devono essere verificati in laboratorio.
+
+VPN E UTM
+WireGuard; Suricata IPS inline; antivirus ClamAV per download tramite proxy HTTP.
+Nessuna ispezione antivirus del contenuto HTTPS. IPsec non implementato.
+Modifiche firewall: verifica, applica, conferma entro 90 secondi o ripristino.
+Le funzioni UTM restano sperimentali: verifica firme e stato reale dei servizi.
+
+AGGIORNAMENTO DI UNA INSTALLAZIONE DEVUAN ESISTENTE
+Dalla console dell'apparato, con il file .deb nella directory corrente:
+  apt install ./murus-igneus_0.3.0~alpha.2_all.deb
+  rc-service murus-igneus start
+Il pacchetto conserva la directory di configurazione; l'aggiornamento arresta
+il servizio prima di sostituire i file, e non lo riavvia automaticamente.
+Le impostazioni AI e le credenziali SNMP non sono incluse nell'esportazione
+JSON della bozza firewall: sono file separati sotto /etc/murus_igneus.
+
+SORGENTI E ISTRUZIONI DETTAGLIATE
+https://github.com/blasterfish7/murus_igneus/pull/5
+https://github.com/blasterfish7/murus_igneus/blob/codex/ai-switch-management/docs/AI-SWITCHES.md
+
+PROVENIENZA DELLA BUILD
+Sorgenti: e749f34fb5ab5e497197241e8c1879a62555cbe4
+Build GitHub Actions: https://github.com/blasterfish7/murus_igneus/actions/runs/39339700961
+94 test automatici superati localmente e in CI.
+Firme ClamAV ufficiali incluse e verificate durante la build.
+ClamAV di Devuan: 1.4.3; FreshClam raccomanda 1.4.6. Questo limite resta aperto.
+
+murus-igneus-0.3.0-alpha.2-devuan-amd64.iso
+472274944 byte
+SHA-256: fa3ee325e358401563e5350588b0cdec84833855f1de1310a849888b953b74ba
+
+murus-igneus_0.3.0~alpha.2_all.deb
+60312 byte
+SHA-256: 52f16678adac14d34db2b48ffb8c94de020073f63d8021af8605be0aff21d9f3
+
+
+COLLAUDO DELLA ISO CONSEGNATA
+Avvio UEFI, API AI/SNMP, installer web e riavvio dal disco senza ISO: superati.
+Impostazioni AI e credenziali SNMP conservate dopo il riavvio: verificato.
+La VM di prova e stata spenta al termine.
+Test SNMP reali contro un agente di laboratorio, inclusi SET su una porta emulata.
+Nessun comando inviato a switch fisici.
+Le risposte del modello Qwen3:4b hanno mostrato anche errori e proposte rifiutate
+per formato non valido: la parte proposte AI resta sperimentale e richiede controllo.
