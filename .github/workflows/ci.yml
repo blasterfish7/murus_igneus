@@ -4,85 +4,18 @@ on:
     branches: [codex/release-alpha2]
 permissions:
   contents: write
-  actions: read
 concurrency:
   group: publish-alpha2
   cancel-in-progress: false
 jobs:
   publish:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: blasterfish7/murus_igneus
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Verify source build and retrieve original artifacts
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh api repos/blasterfish7/murus_igneus/actions/runs/39339700961 > run.json
-          python3 - <<'PY'
-          import json
-          r = json.load(open("run.json"))
-          assert r["head_sha"] == "e749f34fb5ab5e497197241e8c1879a62555cbe4"
-          assert r["status"] == "completed" and r["conclusion"] == "success"
-          assert r["event"] == "push"
-          PY
-          mkdir -p assets
-          gh run download 39339700961 --name murus-igneus-devuan-iso --dir assets
-          gh run download 39339700961 --name murus-igneus-devuan-alpha --dir assets
-          cp release/alpha2/MURUS-IGNEUS-ALPHA2-LEGGIMI.txt assets/
-          cat > assets/murus-igneus-0.3.0-alpha.2.sha256 <<'SUMS'
-          fa3ee325e358401563e5350588b0cdec84833855f1de1310a849888b953b74ba  murus-igneus-0.3.0-alpha.2-devuan-amd64.iso
-          52f16678adac14d34db2b48ffb8c94de020073f63d8021af8605be0aff21d9f3  murus-igneus_0.3.0~alpha.2_all.deb
-          SUMS
-          cd assets
-          sha256sum --check murus-igneus-0.3.0-alpha.2.sha256
-          test "$(stat -c %s murus-igneus-0.3.0-alpha.2-devuan-amd64.iso)" = 472274944
-          test "$(stat -c %s murus-igneus_0.3.0~alpha.2_all.deb)" = 60312
-      - name: Create draft, upload and verify assets, then publish prerelease
-        shell: bash
-        run: |
-          set -euo pipefail
-          if gh release view v0.3.0-alpha.2 >/dev/null 2>&1; then
-            echo "Release already exists; refusing to overwrite."
-            exit 1
-          fi
-          gh api --method POST repos/blasterfish7/murus_igneus/git/refs \
-            -f ref=refs/tags/v0.3.0-alpha.2 \
-            -f sha=e749f34fb5ab5e497197241e8c1879a62555cbe4
-          gh release create v0.3.0-alpha.2 \
-            --verify-tag \
-            --title "Murus Igneus 0.3.0-alpha.2 — Devuan, AI e switch locali" \
-            --notes-file release/alpha2/RELEASE.md --draft --prerelease \
-            assets/murus-igneus-0.3.0-alpha.2-devuan-amd64.iso \
-            assets/murus-igneus_0.3.0~alpha.2_all.deb \
-            assets/MURUS-IGNEUS-ALPHA2-LEGGIMI.txt \
-            assets/murus-igneus-0.3.0-alpha.2.sha256
-          gh api repos/blasterfish7/murus_igneus/git/ref/tags/v0.3.0-alpha.2 > tag.json
-          gh api repos/blasterfish7/murus_igneus/releases/tags/v0.3.0-alpha.2 > release.json
-          python3 - <<'PY'
-          import hashlib, json, pathlib
-          tag = json.load(open("tag.json"))
-          assert tag["object"]["type"] == "commit"
-          assert tag["object"]["sha"] == "e749f34fb5ab5e497197241e8c1879a62555cbe4"
-          r = json.load(open("release.json"))
-          assert r["draft"] and r["prerelease"]
-          names = ["murus-igneus-0.3.0-alpha.2-devuan-amd64.iso",
-                   "murus-igneus_0.3.0~alpha.2_all.deb",
-                   "MURUS-IGNEUS-ALPHA2-LEGGIMI.txt",
-                   "murus-igneus-0.3.0-alpha.2.sha256"]
-          assets = {a["name"]: a for a in r["assets"]}
-          assert set(assets) == set(names)
-          for name in names:
-              a = assets[name]
-              p = pathlib.Path("assets") / name
-              assert a["state"] == "uploaded" and a["size"] == p.stat().st_size
-              if a.get("digest"):
-                  assert a["digest"] == "sha256:" + hashlib.file_digest(p.open("rb"), "sha256").hexdigest()
-          PY
-          gh release edit v0.3.0-alpha.2 --draft=false --prerelease --latest=false
-          gh release view v0.3.0-alpha.2 --json url,isDraft,isPrerelease,assets
+      - name: Verify draft assets and publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 release/alpha2/publish.py

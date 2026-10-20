@@ -52,7 +52,7 @@ Le funzioni UTM restano sperimentali: verifica firme e stato reale dei servizi.
 
 AGGIORNAMENTO DI UNA INSTALLAZIONE DEVUAN ESISTENTE
 Dalla console dell'apparato, con il file .deb nella directory corrente:
-  apt install ./murus-igneus_0.3.0~alpha.2_all.deb
+  apt install ./murus-igneus_0.3.0-alpha.2_all.deb
   rc-service murus-igneus start
 Il pacchetto conserva la directory di configurazione; l'aggiornamento arresta
 il servizio prima di sostituire i file, e non lo riavvia automaticamente.
@@ -74,7 +74,7 @@ murus-igneus-0.3.0-alpha.2-devuan-amd64.iso
 472274944 byte
 SHA-256: fa3ee325e358401563e5350588b0cdec84833855f1de1310a849888b953b74ba
 
-murus-igneus_0.3.0~alpha.2_all.deb
+murus-igneus_0.3.0-alpha.2_all.deb
 60312 byte
 SHA-256: 52f16678adac14d34db2b48ffb8c94de020073f63d8021af8605be0aff21d9f3
 
