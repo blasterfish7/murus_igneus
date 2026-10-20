@@ -8,7 +8,7 @@ import threading
 
 LIMIT=20*1024**2
 SEMAPHORE=threading.BoundedSemaphore(4)
-HOP={'connection','proxy-connection','proxy-authorization','proxy-authenticate','keep-alive','transfer-encoding','te','trailer','upgrade','content-length','host','accept-encoding','range','if-range'}
+HOP={'connection','proxy-connection','proxy-authorization','proxy-authenticate','keep-alive','transfer-encoding','te','trailer','upgrade','content-length','host','accept-encoding','range','if-range','if-none-match','if-modified-since','if-match','if-unmodified-since'}
 
 def create_proxy(config,scan,address=('0.0.0.0',3128)):
     clients=[ip.IPv4Network(n) for n in config['clients']]
@@ -40,6 +40,7 @@ def create_proxy(config,scan,address=('0.0.0.0',3128)):
                 headers['Host']=url.netloc;headers['Connection']='close';headers['Accept-Encoding']='identity'
                 upstream.request('GET',(url.path or '/')+('?' +url.query if url.query else ''),headers=headers)
                 response=upstream.getresponse()
+                if response.status==304:return self.send_error(502,'Cache validation without a full antivirus scan is not supported')
                 if response.getheader('Content-Encoding','identity').strip().lower() not in ('','identity'):return self.send_error(502,'Encoded responses are not supported by this download proxy')
                 if response.status==206 or response.getheader('Content-Range'):return self.send_error(502,'Partial responses are not supported by this download proxy')
                 body=response.read(LIMIT+1)
@@ -61,4 +62,5 @@ def local_addresses():
     # Never allow the proxy to target the appliance's management/control endpoints.
     import json,subprocess
     return {a['local'] for i in json.loads(subprocess.check_output(['ip','-j','-4','addr'],text=True)) for a in i.get('addr_info',[])}
+
 

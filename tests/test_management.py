@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src/murus_igneus')
 import assistant
 import server
 import switches
-from configuration import empty
+from configuration import empty, compile_config
 from tasks import Task
 
 
@@ -66,11 +66,27 @@ class AssistantTests(unittest.TestCase):
         self.assertEqual(request['model'], 'qwen3:4b')
         self.assertNotIn('tools', request)
     def test_valid_proposal_is_only_returned_as_draft(self):
-        OllamaStub.answer = {'answer': 'Proposta', 'configuration': empty()}
+        OllamaStub.answer = {'answer': 'Proposta', 'configuration': compile_config(empty())['configuration']}
         assistant.ask(self.temp.name, {'question': 'Proponi', 'allow_proposal': True, 'configuration': empty()}, 'eth0')
         result = wait(assistant.TASK)['result']
         self.assertEqual(result['proposal']['schema'], 1)
         self.assertFalse(result['applied'])
+    def test_incomplete_proposal_cannot_silently_clear_draft(self):
+        OllamaStub.answer = {'answer': 'Aggiunta una regola', 'configuration': {'schema': 1}}
+        assistant.ask(self.temp.name, {'question': 'Aggiungi', 'allow_proposal': True, 'configuration': empty()}, 'eth0')
+        result = wait(assistant.TASK)['result']
+        self.assertIsNone(result['proposal'])
+        self.assertIn('proposal_errors', result)
+
+    def test_partial_vpn_section_cannot_reset_saved_settings(self):
+        proposal = compile_config(empty())['configuration']
+        proposal['vpn'] = {'enabled': False}
+        OllamaStub.answer = {'answer': 'Proposta', 'configuration': proposal}
+        assistant.ask(self.temp.name, {'question': 'Proponi', 'allow_proposal': True, 'configuration': empty()}, 'eth0')
+        result = wait(assistant.TASK)['result']
+        self.assertIsNone(result['proposal'])
+        self.assertIn('Sezione incompleta: vpn', result['proposal_errors'][0])
+
     def test_invalid_model_proposal_rejected(self):
         OllamaStub.answer = {'answer': 'Esegui', 'configuration': {'schema': 1, 'shell': 'reboot'}}
         assistant.ask(self.temp.name, {'question': 'Proponi', 'allow_proposal': True, 'configuration': empty()}, 'eth0')
@@ -182,6 +198,40 @@ class SwitchTests(unittest.TestCase):
             self.assertEqual(self.sets, [(switches.IFACE + '.7.2', 2)])
             with self.assertRaises(ValueError):
                 switches.apply(self.state, {'token': plan['token'], 'confirmation': plan['confirmation']})
+    def test_uncertain_set_invalidates_previous_telemetry(self):
+        with patch.object(switches, 'snmp', self.fake_snmp):
+            switches.poll(self.state, self.ident)
+            wait(switches.TASK)
+            plan = self.plan()
+        def uncertain(row, oid, value=None, walk=False):
+            if value is not None:
+                self.admin = value  # agent changed state, but its reply was lost
+                raise ValueError('Timeout SNMP')
+            return self.fake_snmp(row, oid, value, walk)
+        with patch.object(switches, 'snmp', uncertain):
+            switches.apply(self.state, {'token': plan['token'], 'confirmation': plan['confirmation']})
+            self.assertEqual(wait(switches.TASK)['state'], 'failed')
+        t = switches.inventory(self.state)['devices'][0]['telemetry']
+        self.assertNotIn('ports', t)
+        self.assertIn('error', t)
+
+    def test_lost_readback_reports_uncertain_state_and_clears_cache(self):
+        with patch.object(switches, 'snmp', self.fake_snmp):
+            switches.poll(self.state, self.ident)
+            wait(switches.TASK)
+            plan = self.plan()
+        oid = switches.IFACE + '.7.2'
+        def lost_readback(row, requested, value=None, walk=False):
+            if requested == oid and value is None:
+                raise ValueError('Timeout SNMP')
+            return self.fake_snmp(row, requested, value, walk)
+        with patch.object(switches, 'snmp', lost_readback):
+            switches.apply(self.state, {'token': plan['token'], 'confirmation': plan['confirmation']})
+            result = wait(switches.TASK)
+        self.assertEqual(self.sets, [(oid, 2)])
+        self.assertIn('SET inviato, stato finale non confermato', result['error'])
+        self.assertNotIn('ports', switches.inventory(self.state)['devices'][0]['telemetry'])
+
     def test_wrong_confirmation_never_sends_set(self):
         with patch.object(switches, 'snmp', self.fake_snmp):
             plan = self.plan()
@@ -249,6 +299,14 @@ class APIManagementTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(self.request('/api/switches')[0], 200)
         self.assertEqual(self.request('/management.js')[0], 200)
+    def test_firewall_apply_cannot_overlap_switch_write(self):
+        with patch.object(server, 'PENDING', None), patch.object(server.jobs, 'busy', return_value=False), \
+                patch.object(server.switches.TASK, 'status', return_value={'state': 'running'}), \
+                patch.object(server, 'run', side_effect=AssertionError('Firewall commands reached during switch task')) as run:
+            with self.assertRaisesRegex(ValueError, 'switch'):
+                server.apply({'ready': True, 'nftables': ''})
+            run.assert_not_called()
+
     def test_invalid_requests_fail_without_connection_drop(self):
         self.assertEqual(self.request('/api/assistant/ask', [], server.CSRF)[0], 400)
         self.assertEqual(self.request('/api/switches/save', {'host': '8.8.8.8'}, server.CSRF)[0], 400)
@@ -256,3 +314,4 @@ class APIManagementTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+

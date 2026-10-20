@@ -185,6 +185,13 @@ def ask(state, data, management, switch_summary=None, logs=''):
             proposal = response.get('configuration')
             if proposal is not None and allow_proposal:
                 try:
+                    # Native imports may fill omitted sections with defaults, but
+                    # a model must return the complete draft it claims to edit.
+                    if not isinstance(proposal, dict) or set(plan['configuration']) - set(proposal):
+                        raise ValueError('Configurazione incompleta: includere tutte le sezioni della bozza, VPN e UTM comprese')
+                    for section in ('vpn', 'utm'):
+                        if not isinstance(proposal[section], dict) or set(plan['configuration'][section]) - set(proposal[section]):
+                            raise ValueError('Sezione incompleta: ' + section)
                     candidate = compile_config(proposal, management)
                     if candidate['ready']:
                         output['proposal'] = candidate['configuration']
@@ -195,3 +202,4 @@ def ask(state, data, management, switch_summary=None, logs=''):
                     output['proposal_errors'] = ['Proposta rifiutata dal validatore: ' + str(exc)[:400]]
             return output
         return TASK.start(action)
+

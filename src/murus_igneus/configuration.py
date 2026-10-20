@@ -161,7 +161,8 @@ def compile_config(config,management='eth0'):
     if settings['vpn']['enabled']:plan['configuration']['interfaces']=[r for r in plan['configuration']['interfaces'] if r['name']!='VPN']
     plan['configuration'].update(settings);plan['security']=settings
     plan['nftables']=security.decorate(plan['nftables'],settings)
-    plan['version']='0.3.0-alpha.2'
+    plan['version']=VERSION
     return plan
+
 
 

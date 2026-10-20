@@ -1,4 +1,11 @@
-# Assistente AI e switch locali — alpha.2
+# Assistente AI e switch locali — alpha.3
+
+La alpha.3 corregge la gestione delle richieste AI concorrenti e rifiuta proposte
+incomplete, comprese sezioni VPN/UTM parziali, prima che possano essere caricate
+nella bozza. Se un'altra sessione sostituisce il risultato, la GUI chiede di ripetere
+la domanda. Non è cambiata la necessità di controllare le risposte del modello.
+Un comando switch blocca temporaneamente l'applicazione del firewall; un SET
+incerto invalida la vecchia telemetria e richiede una nuova lettura.
 
 ## Assistente locale
 
@@ -105,3 +112,4 @@ Client SNMP: Net-SNMP dal componente Devuan `main`. Riferimenti ufficiali:
 - <https://huggingface.co/Qwen/Qwen3-4B>
 - <https://www.net-snmp.org/docs/man/snmpcmd.html>
 - <https://www.net-snmp.org/docs/man/snmp.conf.html>
+

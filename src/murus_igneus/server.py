@@ -102,6 +102,7 @@ def rollback(ident):
 def apply(plan):
     global PENDING,LAST
     if PENDING or jobs.busy():raise Error('Confermare la modifica o attendere la manutenzione in corso')
+    if (switches.TASK.status() or {}).get('state')=='running':raise Error('Attendere l’operazione switch prima di applicare il firewall')
     if not plan or not plan['ready']:raise Error('Migrazione non validata o con incompatibilità')
     run(['nft','--check','-f','-'],plan['nftables'])
     old=run(['nft','list','table','inet','murus_igneus']);ident=secrets.token_hex(16)
@@ -268,4 +269,5 @@ if __name__=='__main__':
             run(['nft','-f','-'],baseline(MGMT),check=False)
             run(['sysctl','-w','net.ipv4.ip_forward=0'],check=False)
             security.activate(security.defaults())
+
 

@@ -5,7 +5,7 @@ import json
 import re
 import shlex
 
-VERSION='0.3.0-alpha.2'  # single runtime source; __init__.py must match (see tests/test_hardening.py)
+VERSION='0.3.0-alpha.3'  # single runtime source; __init__.py must match (see tests/test_hardening.py)
 
 class Error(ValueError): pass
 
@@ -198,4 +198,5 @@ def translate(text,mapping,management='eth0'):
             ops.append({'kind':'route','destination':net(v.get('dst',['0.0.0.0','0.0.0.0'])),'gateway':str(ip.IPv4Address(one(v,'gateway'))),'interface':mapping[dev],'metric':distance*65536+priority})
         except (Error,ValueError) as e:blocked.append(f'Rotta {ident}: {e}')
     return {'version':VERSION,'ready':not blocked,'blockers':blocked,'warnings':warnings,'interfaces':list(interfaces),'mapping':mapping,'network_ops':ops,'nftables':'\n'.join(lines)+'\n','counts':{'interfaces':len(interfaces),'addresses':len(addresses),'groups':len(groups),'services':len(services),'policies':count,'routes':len(routes)}}
+
 

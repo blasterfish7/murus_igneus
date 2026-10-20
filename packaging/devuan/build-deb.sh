@@ -24,7 +24,7 @@ install -m 0644 "$root/docs/DEVUAN.md" "$stage/usr/share/doc/murus-igneus/DEVUAN
 install -m 0644 "$root/docs/AI-SWITCHES.md" "$stage/usr/share/doc/murus-igneus/AI-SWITCHES.md"
 cat > "$stage/DEBIAN/control" <<'EOF'
 Package: murus-igneus
-Version: 0.3.0~alpha.2
+Version: 0.3.0~alpha.3
 Section: net
 Priority: optional
 Architecture: all
@@ -69,5 +69,6 @@ if [ "${1:-}" = configure ]; then
 fi
 EOF
 chmod 0755 "$stage/DEBIAN/preinst" "$stage/DEBIAN/prerm" "$stage/DEBIAN/postinst"
-dpkg-deb --root-owner-group --build "$stage" "$output/murus-igneus_0.3.0~alpha.2_all.deb"
+dpkg-deb --root-owner-group --build "$stage" "$output/murus-igneus_0.3.0~alpha.3_all.deb"
+
 

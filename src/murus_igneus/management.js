@@ -77,11 +77,15 @@
     try { const task = await api('assistant/check', {}); aiJob = task.id; aiKind = 'check'; el('ai-connection').textContent = 'Verifica in corso…'; } catch (exc) { error(exc); }
   };
   el('ai-question-form').onsubmit = async e => {
-    e.preventDefault(); try {
-      aiDraft = JSON.stringify(config); aiProposal = null; el('ai-proposal-panel').hidden = true;
+    e.preventDefault();
+    if (aiJob || el('ai-send').disabled) return;
+    el('ai-send').disabled = true;
+    const submittedDraft = JSON.stringify(config);
+    try {
       const task = await api('assistant/ask', { question: el('ai-question').value, configuration: config, include_logs: el('ai-logs').checked, allow_proposal: el('ai-allow-proposal').checked });
+      aiDraft = submittedDraft; aiProposal = null; el('ai-proposal-panel').hidden = true;
       aiJob = task.id; aiKind = 'ask'; el('ai-state').textContent = 'Il modello locale sta elaborando…'; el('ai-answer').textContent = ''; el('ai-send').disabled = true;
-    } catch (exc) { error(exc); }
+    } catch (exc) { el('ai-send').disabled = false; error(exc); }
   };
   el('ai-use-proposal').onclick = () => {
     if (!aiProposal) return;
@@ -154,7 +158,11 @@
   async function progress() {
     if (aiJob) {
       const data = await api('assistant'), task = data.task;
-      if (task?.id === aiJob && task.state !== 'running') {
+      if (task?.id !== aiJob) {
+        aiJob = null; aiProposal = null; aiDraft = null; el('ai-proposal-panel').hidden = true;
+        el('ai-send').disabled = false;
+        el('ai-state').textContent = 'Risultato non più disponibile o sostituito da un’altra sessione. Ripeti la domanda.';
+      } else if (task.state !== 'running') {
         aiJob = null; el('ai-send').disabled = false;
         if (task.state === 'failed') { el('ai-state').textContent = task.error; el('ai-connection').textContent = task.error; }
         else if (aiKind === 'check') el('ai-connection').textContent = task.result.message;
@@ -185,3 +193,4 @@
   }
   setInterval(() => progress().catch(error), 2000);
 })();
+

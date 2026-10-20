@@ -1,4 +1,30 @@
-# Verification status — 0.3.0-alpha.2
+# Debug fixes — 0.3.0-alpha.3
+
+These source changes follow the published alpha.2 release; they do not modify
+that release's ISO, package, tag, or historical test evidence below.
+
+Reproduced regressions and fixes:
+
+- Refuse firewall activation before executing any commands while a switch task
+  is running. The reverse exclusion already existed.
+- Invalidate cached port state before sending a SET. Both lost SET replies and
+  lost read-back responses now leave an explicit unknown state, not old telemetry.
+- Keep an AI response tied to the exact submitted draft. Duplicate submissions
+  cannot change that association; a superseded task unlocks the form and requests
+  a new question.
+- Reject incomplete AI configurations and partial VPN/UTM sections instead of
+  silently filling omitted sections with empty/default values.
+- Remove conditional HTTP cache headers and reject upstream 304 responses; the
+  antivirus proxy requires a full response body for each proxied download.
+- Use the runtime VERSION constant in the security-aware configuration compiler.
+
+Regression coverage includes actual local management/proxy HTTP requests,
+deterministic SNMP lost-reply simulations and a Node.js simulated-DOM regression
+for AI draft ownership. These are not physical-switch or real-model accuracy
+tests. The alpha.3 ISO has not yet been boot-tested; the UEFI installation and
+VPN/UTM traffic results below refer to the earlier builds explicitly named.
+
+# Previous delivered build — 0.3.0-alpha.2
 
 Verified 2026-10-20 (Europe/Rome). Laboratory software, not a production release.
 
@@ -136,4 +162,5 @@ preserved alongside repository licensing. See docs/DEVUAN.md and docs/PROVENANCE
 tools/validate-devuan-runtime.py replaces configuration and creates namespaces:
 run it only in an explicitly flagged disposable live VM, never on a real network.
 It does not erase a disk.
+
 

@@ -31,6 +31,7 @@ jobs:
           sh -n packaging/devuan/files/murus-serve
           node --check src/murus_igneus/app.js
           node --check src/murus_igneus/management.js
+          node tests/test_management_ui.js
       - name: Build Devuan package
         run: sh packaging/devuan/build-deb.sh
       - name: Upload Devuan package
@@ -63,5 +64,6 @@ jobs:
             dist/clamav-build.log
           compression-level: 0
           retention-days: 14
+
 
 

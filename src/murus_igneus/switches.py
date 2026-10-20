@@ -306,14 +306,22 @@ def apply(state, data):
             if (current['object_id'] != plan['object_id'] or current['name'] != plan['system_name'] or
                     not port or port['name'] != plan['name'] or port['type'] != 6 or port['admin'] != plan['previous']):
                 raise ValueError('Identità o stato della porta cambiati: operazione annullata')
+            # A timed-out SET may already have changed the agent. Never leave the
+            # pre-write port state visible as though it were still authoritative.
+            with LOCK:
+                CACHE[row['id']] = {'polled': time.time(), 'error': 'Modifica porta inviata o in corso: leggere nuovamente lo stato dello switch'}
             try:
                 snmp(row, oid, value=plan['admin'])
             except ValueError:
                 raise ValueError('Esito del SET incerto: verificare lo switch prima di riprovare') from None
-            if integer(snmp(row, oid), oid) != plan['admin']:
-                raise ValueError('SET inviato, stato finale non confermato: verificare lo switch')
+            try:
+                if integer(snmp(row, oid), oid) != plan['admin']:
+                    raise ValueError('Stato differente da quello richiesto')
+            except ValueError:
+                raise ValueError('SET inviato, stato finale non confermato: verificare lo switch') from None
             with LOCK:
                 CACHE.pop(row['id'], None)
             return {'id': row['id'], 'port': plan['port'], 'admin': plan['admin'], 'verified': True,
                     'message': 'Stato amministrativo verificato; persistenza al riavvio dipendente dallo switch'}
         return TASK.start(action)
+

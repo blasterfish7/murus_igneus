@@ -30,7 +30,7 @@ On a machine with Python 3 and `dpkg-deb`:
 sh packaging/devuan/build-deb.sh
 ```
 
-This creates `dist/murus-igneus_0.3.0~alpha.2_all.deb`. Building the package does
+This creates `dist/murus-igneus_0.3.0~alpha.3_all.deb`. Building the package does
 not require root, a chroot, network access, or changes to the host firewall.
 The payload preserves the MIT attribution of the recovered application code
 alongside the repository's GPL-3 license file. It includes no Alpine installer,
@@ -46,7 +46,7 @@ forwarding on that VM.
 
 ```sh
 sudo apt update
-sudo apt install ./dist/murus-igneus_0.3.0~alpha.2_all.deb
+sudo apt install ./dist/murus-igneus_0.3.0~alpha.3_all.deb
 ip -br address
 sudo editor /etc/default/murus-igneus
 ```
@@ -145,4 +145,5 @@ also attempts official ClamAV updates and proxy/EICAR tests. For an offline
 network-only run, explicitly add `MURUS_SKIP_SIGNATURE_UPDATE=YES`; this skips
 antivirus verification and is reported as such. The test never selects or
 erases a disk.
+
 

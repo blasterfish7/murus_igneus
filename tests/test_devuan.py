@@ -53,7 +53,7 @@ class PackageTests(unittest.TestCase):
     def setUpClass(cls):
         cls.temp=tempfile.TemporaryDirectory()
         subprocess.run(['sh',str(ROOT/'packaging/devuan/build-deb.sh'),cls.temp.name],check=True,capture_output=True)
-        cls.package=Path(cls.temp.name)/'murus-igneus_0.3.0~alpha.2_all.deb'
+        cls.package=Path(cls.temp.name)/'murus-igneus_0.3.0~alpha.3_all.deb'
         cls.data=tarfile.open(fileobj=io.BytesIO(subprocess.check_output(['dpkg-deb','--fsys-tarfile',str(cls.package)])))
         cls.control=tarfile.open(fileobj=io.BytesIO(subprocess.check_output(['dpkg-deb','--ctrl-tarfile',str(cls.package)])))
     @classmethod
@@ -77,4 +77,5 @@ class PackageTests(unittest.TestCase):
             fields=line.split();self.assertEqual(fields[0],'deb');self.assertEqual(fields[1],'http://deb.devuan.org/merged');self.assertEqual(fields[3:],['main']);self.assertTrue(fields[2].startswith('excalibur'))
 
 if __name__=='__main__':unittest.main()
+
 
