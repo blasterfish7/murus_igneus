@@ -2,6 +2,7 @@
 import copy
 import ipaddress as ip
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -34,7 +35,7 @@ def run(args, check=True):
     if check and result.returncode:
         # Never include configuration contents or PSKs in API errors.
         raise Error('Comando di rete fallito: ' + args[0])
-    return result.stdout
+    return result.stdout if result.returncode == 0 else ''
 
 
 def fields(value, allowed):
@@ -204,10 +205,14 @@ def ipsec_start(settings, interfaces):
  }
 }
 ''')]:
-        path = RUN / name; path.write_text(content.replace('@RUN@',str(RUN))); path.chmod(0o600)
-    import os
+        path = RUN / name
+        fd = os.open(path,os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600)
+        with os.fdopen(fd,'w') as stream:
+            stream.write(content.replace('@RUN@',str(RUN)))
+        path.chmod(0o600)
     environment = {**os.environ, 'STRONGSWAN_CONF': str(RUN / 'charon.conf')}
-    DAEMON_LOG = (RUN / 'charon.log').open('a')
+    fd = os.open(RUN / 'charon.log',os.O_WRONLY|os.O_CREAT|os.O_APPEND,0o600)
+    DAEMON_LOG = os.fdopen(fd,'a')
     DAEMON = subprocess.Popen(['/usr/lib/ipsec/charon'], stdout=DAEMON_LOG, stderr=DAEMON_LOG, env=environment)
     try:
         for _ in range(40):

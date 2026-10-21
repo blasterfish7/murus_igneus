@@ -127,6 +127,10 @@ class NewFeatures(unittest.TestCase):
         current['routes'] = [{'id':'1','destination':'0.0.0.0/0','gateway':'198.18.0.254','interface':'WAN','enabled':True}]
         with self.assertRaises(ValueError):
             configuration.compile_config(current)
+    def test_absent_routing_table_does_not_return_partial_json(self):
+        result = subprocess.CompletedProcess(['ip'],2,stdout='[\n',stderr='FIB table does not exist')
+        with patch.object(enterprise.subprocess,'run',return_value=result):
+            self.assertEqual(enterprise.run(['ip','route'],check=False),'')
     def test_stopping_unused_wan_does_not_change_host_routes(self):
         with patch.object(enterprise,'run') as run:
             enterprise.wan_stop()
