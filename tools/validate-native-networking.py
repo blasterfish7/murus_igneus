@@ -4,6 +4,7 @@ Never run in a workstation/production network namespace.
 """
 import copy
 import json
+import ipaddress
 import os
 from pathlib import Path
 import subprocess
@@ -132,7 +133,7 @@ s.sendto(packet(3,bytes([50,4])+offer[16:20]+bytes([54,4])+opts[54]),("255.255.2
 print(json.dumps({'address':socket.inet_ntoa(ack[16:20]),'gateway':socket.inet_ntoa(opts[3][:4]),'dns':socket.inet_ntoa(opts[6][:4])}))
 '''
         lease = json.loads(ns('milan', ['python3', '-c', dhcp_client]))
-        assert lease['address'].startswith('198.51.100.10') and lease['gateway'] == '198.51.100.1' and lease['dns'] == '198.51.100.1', lease
+        assert ipaddress.IPv4Address('198.51.100.100') <= ipaddress.IPv4Address(lease['address']) <= ipaddress.IPv4Address('198.51.100.110') and lease['gateway'] == '198.51.100.1' and lease['dns'] == '198.51.100.1', lease
         assert networking.health()['leases'], 'Lease file missing'
         ok('Real DHCP discover/offer/request/ack over VLAN, gateway and DNS options, lease file')
         sessions = traffic.snapshot()

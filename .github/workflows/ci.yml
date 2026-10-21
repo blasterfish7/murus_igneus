@@ -114,6 +114,7 @@ jobs:
       - name: Boot original ISO and run real network acceptance in guest
         run: MURUS_LAB=YES python3 tools/validate-iso-networking.py
       - name: Save ISO, checksums and package manifest
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: murus-igneus-devuan-iso
@@ -124,6 +125,7 @@ jobs:
             dist/signature-status.txt
             dist/clamav-build.log
             dist/alpha5-iso-networking-qa.json
+            dist/alpha5-iso-console.log
           compression-level: 0
           retention-days: 14
 
