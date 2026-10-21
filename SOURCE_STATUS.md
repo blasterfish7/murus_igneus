@@ -1,3 +1,11 @@
+# Published release — 0.3.0-alpha.5
+
+PR #6 is merged into main. [Download the alpha.5 prerelease](https://github.com/blasterfish7/murus_igneus/releases/tag/v0.3.0-alpha.5).
+Tag target: `ae8b9fcb98c016cc9ac05ef8381862aca4203102`; tested build source: `55ec4ea84c58f0c036cd50ac9a7266a7c96fdd38`. Only acceptance documentation changed after testing. [Publisher run 39654082948](https://github.com/blasterfish7/murus_igneus/actions/runs/39654082948) verified original build archives, ISO checksum/embedded 24-check report and all seven uploaded asset digests before publishing.
+
+ISO SHA-256: `7bbceee7a1bdde8e47b909c46c22e2effa1c9c5f1836dcf6f33239c8c659fc81`.
+DEB SHA-256: `a8e2a8434da887315a5b8795b3a6beec8ae0e5ef7b8950d6ba4cafb643765776`.
+
 # Alpha.5 acceptance — 2026-10-21
 
 Candidate source: `55ec4ea84c58f0c036cd50ac9a7266a7c96fdd38`.

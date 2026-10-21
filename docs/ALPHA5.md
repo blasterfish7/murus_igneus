@@ -1,6 +1,6 @@
-# Alpha.5: sviluppo e collaudo
+# Alpha.5: funzioni e collaudo
 
-Questa modifica prepara la alpha.5; la release pubblicata rimane alpha.4 finché il nuovo artefatto non viene collaudato e pubblicato. Solo codice originale e componenti open source della distribuzione; nessun codice, firmware o asset Fortinet.
+[Alpha.5 pubblicata](https://github.com/blasterfish7/murus_igneus/releases/tag/v0.3.0-alpha.5), con ISO, DEB, guida, checksum e resoconto originale del collaudo. Solo codice originale e componenti open source della distribuzione; nessun codice, firmware o asset Fortinet.
 
 ## Assistente
 
