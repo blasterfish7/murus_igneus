@@ -1,4 +1,4 @@
-# Alpha.5 acceptance — 2026-10-21
+# Alpha.5 candidate — corrected appliance IPsec ownership pending ISO revalidation
 
 Candidate source: `722fc4d5aa638d651705f39a7f11b935ca6c261b`.
 [CI and original ISO acceptance passed](https://github.com/blasterfish7/murus_igneus/actions/runs/39649427949): 138 Python tests without skips, 8 Chromium checks, 11 native and 9 enterprise packet checks; 23 checks inside the original UEFI live ISO. All 24 packaged application files match the tested source.

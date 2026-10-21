@@ -62,10 +62,23 @@ c['interfaces']=[{'name':'TRUNK','device':'eth2','address':''},{'name':'LAN','de
 p=api('configuration/preview',{'configuration':c});assert p['ready'],p
 assert p['network_ops'][0]['kind']=='vlan',p
 print('ISO_HTTPS_ALPHA5_NATIVE_VLAN_PREVIEW_OK')
+c=api('configuration')['configuration']
+c['interfaces']=[{'name':'WAN','device':'eth1','address':'198.18.0.1/24'},{'name':'LAN','device':'eth2','address':'10.80.1.1/24'}]
+c['ipsec']=[{'id':1,'enabled':True,'public_device':'eth1','remote_ip':'198.18.0.2','local_id':'iso-local','remote_id':'iso-remote','local_network':'10.80.1.0/24','remote_network':'10.80.2.0/24','psk':'LabOnlyRootServiceSecret123456'}]
+p=api('configuration/preview',{'configuration':c});assert p['ready'],p
+applied=api('apply',{'plan_id':p['plan_id']});assert applied['id'],applied
+try:
+ h=api('enterprise');assert h['ipsec_running'],h
+finally:
+ api('rollback',{})
+assert not api('enterprise')['ipsec_running']
+assert api('status')['pending'] is None
+print('ISO_ROOT_IPSEC_APPLY_ROLLBACK_OK')
 '''
         encoded = base64.b64encode(probe.encode()).decode()
         command("python3 -c \"import base64;exec(base64.b64decode('" + encoded + "'))\"")
         checks.append('Real HTTPS backend alpha.5, empty setup and native VLAN preview'); print('PASS ' + checks[-1], flush=True)
+        checks.append('Real appliance HTTPS preview/apply starts owned strongSwan and rollback stops it'); print('PASS ' + checks[-1], flush=True)
         command('mkdir -p /tmp/murus-qa/tools /tmp/murus-qa/src && cp -a /usr/lib/murus-igneus /tmp/murus-qa/src/murus_igneus')
         payload = base64.b64encode(gzip.compress((ROOT / 'tools/validate-native-networking.py').read_bytes())).decode()
         command(': > /tmp/murus-qa/runtime.b64')

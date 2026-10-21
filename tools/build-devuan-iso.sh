@@ -76,7 +76,7 @@ touch "$root/etc/murus_igneus/live-image"
 printf '\nT0:2345:respawn:/sbin/agetty -L ttyS0 115200 vt100\n' >> "$root/etc/inittab"
 chroot "$root" rc-update add murus-igneus default
 # Murus owns these processes and starts them only after validated configuration.
-for service in suricata clamav-daemon clamav-freshclam strongswan strongswan-starter; do
+for service in suricata clamav-daemon clamav-freshclam ipsec strongswan strongswan-starter; do
     if [[ -f "$root/etc/init.d/$service" ]]; then
         chroot "$root" update-rc.d "$service" disable
     fi
