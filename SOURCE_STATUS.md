@@ -1,3 +1,35 @@
+# ISO alpha.3 acceptance — 2026-10-21
+
+The original ISO from source `f7517ea456a751c0e0e7e08675d56c5de5903349`
+has now completed real UEFI live boot, native configuration apply/confirm/rollback,
+Chromium GUI checks, web installation on a disposable 10 GiB disk and disk-only
+UEFI boot without an ISO. VPN/UTM configuration, AI settings and private SNMP
+credentials survived installation. The installed WireGuard key predates boot;
+the tunnel interface, IPS, ClamAV and proxy were ready. Real ClamAV/proxy tests
+accepted clean content, blocked EICAR and rejected upstream HTTP 304 responses,
+both live and installed. The installed VM completed shutdown and is powered off.
+
+ISO SHA-256:
+`cac1e14d3a82740e3332c43fa3bd81de86444eaf6cffa61c2415fa0223c57e26`.
+
+Environment: QEMU 8.2.2 TCG, OVMF UEFI (no Secure Boot), 2 vCPU, 3072 MiB RAM,
+three VirtIO NICs and Chromium 153.0.8010.0. There are 17 recorded acceptance
+checks; these are distinct from the 101 CI tests below.
+
+Observation: live shutdown exceeded the initial 90-second lab deadline. That VM
+was force-stopped after installer success, sync and target unmount, then the same
+disk was booted independently. Installed shutdown completed with a longer wait.
+OpenRC's existing udev real/virtual-service warning remains; gzip was used when
+zstd was absent. No ISO/source changes were needed for the acceptance run.
+
+AI used a controlled HTTP fixture, not a real model. No physical-switch writes,
+full forwarded VPN/IPS/NAT traffic matrix, Secure Boot, BIOS or physical hardware
+compatibility test was performed. HTTP proxy checks originated in the guest with
+a LAN source address; they are not an external physical-client path test.
+
+See [the acceptance report](docs/ISO-ALPHA3-QA.md) and
+[structured results](docs/qa/alpha3-iso-validation.json) for exact scope and observations.
+
 # Debug fixes — 0.3.0-alpha.3
 
 These source changes follow the published alpha.2 release; they do not modify
@@ -42,8 +74,8 @@ Release. The alpha.2 prerelease and its tag/binaries were not replaced.
 Regression coverage includes actual local management/proxy HTTP requests,
 deterministic SNMP lost-reply simulations and a Node.js simulated-DOM regression
 for AI draft ownership. These are not physical-switch or real-model accuracy
-tests. The alpha.3 ISO has not yet been boot-tested; the UEFI installation and
-VPN/UTM traffic results below refer to the earlier builds explicitly named.
+tests. Alpha.3 ISO boot/installation acceptance is now recorded above. Historical
+VPN/UTM traffic results below still refer to the earlier builds explicitly named.
 
 # Previous delivered build — 0.3.0-alpha.2
 
