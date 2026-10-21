@@ -24,12 +24,16 @@ def connect(state):
     return db
 
 
+def prune(db):
+    db.execute('DELETE FROM events WHERE time < ?', (time.time() - 30 * 86400,))
+    db.execute('DELETE FROM events WHERE id < COALESCE((SELECT id FROM events ORDER BY id DESC LIMIT 1 OFFSET 19999),0)')
+
+
 def append(state, kind, detail, fingerprint=None):
     with closing(connect(state)) as db, db:
         db.execute('INSERT OR IGNORE INTO events(time,kind,detail,fingerprint) VALUES (?,?,?,?)',
                    (time.time(), kind, json.dumps(detail, ensure_ascii=False)[:6000], fingerprint))
-        db.execute('DELETE FROM events WHERE time < ?', (time.time() - 30 * 86400,))
-        db.execute('DELETE FROM events WHERE id <= COALESCE((SELECT id FROM events ORDER BY id DESC LIMIT 1 OFFSET 19999),0) AND id != (SELECT max(id) FROM events)')
+        prune(db)
 
 
 def history(state):
@@ -42,9 +46,12 @@ def history(state):
 def collect(state):
     raw, _ = traffic.capture(['dmesg', '--color=never'], tail=True)
     boot = Path('/proc/sys/kernel/random/boot_id').read_text().strip()
-    for row in traffic.events(raw):
-        fingerprint = hashlib.sha256((boot + row['raw']).encode()).hexdigest()
-        append(state, 'packet', row, fingerprint)
+    with closing(connect(state)) as db, db:
+        for row in traffic.events(raw):
+            fingerprint = hashlib.sha256((boot + row['raw']).encode()).hexdigest()
+            db.execute('INSERT OR IGNORE INTO events(time,kind,detail,fingerprint) VALUES (?,?,?,?)',
+                       (time.time(), 'packet', json.dumps(row, ensure_ascii=False)[:6000], fingerprint))
+        prune(db)
 
 
 def start(state):

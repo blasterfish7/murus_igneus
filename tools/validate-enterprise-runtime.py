@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src/murus_igneus'))
 
 if '--agent' in sys.argv:
+    subprocess.run(['mount','--make-rprivate','/'],check=True)
+    subprocess.run(['mount','-t','tmpfs','tmpfs','/run'],check=True)
     import enterprise
     import configuration
     enterprise.RUN = Path(sys.argv[-1]); enterprise.RUN.mkdir(mode=0o700)
@@ -74,7 +76,7 @@ def route(space, destination, gateway):
 
 
 def agent(space, work):
-    process = subprocess.Popen(['ip','netns','exec',space,sys.executable,'-u',str(Path(__file__).resolve()),'--agent',str(work/space)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,bufsize=1)
+    process = subprocess.Popen(['ip','netns','exec',space,'unshare','--mount','--fork',sys.executable,'-u',str(Path(__file__).resolve()),'--agent',str(work/space)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,bufsize=1)
     AGENTS.append(process);return process
 
 

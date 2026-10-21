@@ -196,7 +196,6 @@ def ipsec_start(settings, interfaces):
     for name, content in [('swanctl.conf', swan_config(settings, interfaces)), ('charon.conf', '''charon {
  install_routes = no
  load_modular = yes
- pid_file = @RUN@/charon.pid
  plugins {
   include /etc/strongswan.d/charon/*.conf
   vici {
