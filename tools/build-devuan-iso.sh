@@ -77,7 +77,9 @@ printf '\nT0:2345:respawn:/sbin/agetty -L ttyS0 115200 vt100\n' >> "$root/etc/in
 chroot "$root" rc-update add murus-igneus default
 # Murus owns these processes and starts them only after validated configuration.
 for service in suricata clamav-daemon clamav-freshclam strongswan strongswan-starter; do
-    chroot "$root" update-rc.d "$service" disable
+    if [[ -f "$root/etc/init.d/$service" ]]; then
+        chroot "$root" update-rc.d "$service" disable
+    fi
 done
 # Enable the network service at boot; package defaults are retained for other base services.
 chroot "$root" update-rc.d networking defaults
