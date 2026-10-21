@@ -33,6 +33,7 @@ jobs:
           node --check src/murus_igneus/management.js
           node --check src/murus_igneus/network.js
           node tests/test_management_ui.js
+          node tests/test_network_ui.js
       - name: Build Devuan package
         run: sh packaging/devuan/build-deb.sh
       - name: Upload Devuan package

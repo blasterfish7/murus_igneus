@@ -59,7 +59,7 @@ def dns(namespace, target, expected=True):
 s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);s.settimeout(2)
 packet=struct.pack('!6H',1234,256,1,0,0,0)+b'\\x07example\\x04test\\0'+struct.pack('!2H',1,1)
 try:
- s.sendto(packet,(%r,53));reply=s.recv(4096);print(json.dumps({'answer':socket.inet_ntoa(reply[-4:])}))
+ s.sendto(packet,(%r,53));reply=s.recv(4096);assert reply[3]&15==0 and struct.unpack('!H',reply[6:8])[0]>0,reply.hex();print(json.dumps({'answer':socket.inet_ntoa(reply[-4:])}))
 except OSError as e:print(json.dumps({'error':str(e)}))
 ''' % target
     value = json.loads(ns(namespace, ['python3', '-c', code]))
@@ -92,7 +92,10 @@ HTTPServer(('0.0.0.0',18080),H).serve_forever()
         dns_fixture = '''import socket,struct
 s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);s.bind(('192.0.2.2',53))
 while True:
- packet,client=s.recvfrom(4096);reply=packet[:2]+struct.pack('!5H',0x8180,1,1,0,0)+packet[12:]+b'\\xc0\\x0c'+struct.pack('!HHIH',1,1,30,4)+socket.inet_aton('203.0.113.77');s.sendto(reply,client)
+ packet,client=s.recvfrom(4096);end=12
+ while packet[end]:end+=packet[end]+1
+ end+=5
+ reply=packet[:2]+struct.pack('!5H',0x8180,1,1,0,0)+packet[12:end]+b'\\xc0\\x0c'+struct.pack('!HHIH',1,1,30,4)+socket.inet_aton('203.0.113.77');s.sendto(reply,client)
 '''
         for namespace, code in [('milan', fixture), ('miwan', dns_fixture)]:
             processes.append(subprocess.Popen(['ip', 'netns', 'exec', namespace, 'python3', '-c', code], stdout=subprocess.DEVNULL, stderr=sys.stderr))
