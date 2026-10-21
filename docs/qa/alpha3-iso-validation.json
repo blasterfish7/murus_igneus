@@ -1,0 +1,49 @@
+{
+  "source": "f7517ea456a751c0e0e7e08675d56c5de5903349",
+  "checks": {
+    "ISO_SHA256_VERIFIED": true,
+    "LIVE_UEFI_BOOT": true,
+    "AUTH_AND_CSRF": true,
+    "NATIVE_SETUP_APPLY_CONFIRM_AND_ROLLBACK_NO_BACKUP": true,
+    "AI_CONNECTOR_WITH_CONTROLLED_HTTP_FIXTURE": true,
+    "SNMP_INVENTORY_SECRETS_AND_TOOLS": true,
+    "LIVE_VPN_IPS_CLAMAV_SERVICES_READY": true,
+    "LIVE_REAL_AV_CLEAN_EICAR_AND_PROXY_304": true,
+    "LIVE_BROWSER_GUI_NO_JS_ERRORS": true,
+    "WEB_INSTALLER_COMPLETED": true,
+    "INSTALLED_DISK_ONLY_UEFI_BOOT": true,
+    "INSTALLED_CONFIGURATION_AI_SNMP_AND_UTM_PERSISTENCE": true,
+    "INSTALLED_WIREGUARD_KEY_PREDATES_BOOT_AND_INTERFACE_READY": true,
+    "INSTALLED_AI_CONNECTOR_FIXTURE_REACHABLE": true,
+    "INSTALLED_REAL_AV_CLEAN_EICAR_AND_PROXY_304": true,
+    "INSTALLED_BROWSER_GUI_NO_JS_ERRORS": true,
+    "VM_POWERED_OFF": true
+  },
+  "observations": [
+    "Live poweroff exceeded the initial 90-second lab timeout. The VM was force-stopped only after installer success, sync and target unmount. Disk-only acceptance continued without reinstalling or modifying the ISO."
+  ],
+  "success": true,
+  "iso": {
+    "name": "murus-igneus-0.3.0-alpha.3-devuan-amd64.iso",
+    "bytes": 472274944,
+    "sha256": "cac1e14d3a82740e3332c43fa3bd81de86444eaf6cffa61c2415fa0223c57e26"
+  },
+  "date": "2026-10-21",
+  "environment": {
+    "qemu": "8.2.2",
+    "acceleration": "TCG",
+    "firmware": "OVMF UEFI, secure boot not enabled",
+    "vcpus": 2,
+    "ram_mib": 3072,
+    "disk_gib": 10,
+    "network_interfaces": "3 VirtIO, isolated QEMU user networks",
+    "browser": "Chromium 153.0.8010.0"
+  },
+  "scope_limits": [
+    "AI used a controlled Ollama-compatible HTTP fixture, not real model weights or model accuracy tests.",
+    "SNMP inventory, credential persistence/redaction and installed client availability were checked; no physical switch or SET operation was used.",
+    "WireGuard interface/key readiness and IPS service/queue startup were checked; no end-to-end WireGuard handshake or full forwarded VPN/IPS/NAT traffic matrix was run.",
+    "HTTP antivirus used real ClamAV scans and proxy requests from the guest with a LAN source address to a controlled host fixture; this is not a physical external-client network-path test.",
+    "No HTTPS antivirus inspection, Secure Boot, BIOS boot or physical hardware compatibility test."
+  ]
+}

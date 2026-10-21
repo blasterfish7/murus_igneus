@@ -218,3 +218,17 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Murus Igneus: never commit secrets, runtime state or real device backups (see SECURITY.md)
+*.key
+*.pem
+*.crt
+admin.password
+active.json
+*.conf
+!tests/example.conf
+
+
+# Local AI/SNMP settings contain infrastructure details and credentials
+switches.json
+assistant.json

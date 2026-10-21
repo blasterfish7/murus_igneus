@@ -1,0 +1,7 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+printf '\nOpenWall Community Lab 0.2.0 — x86_64\n'
+ip -o -4 addr show dev eth0 | awk '{split($4,a,"/"); print "Gestione: https://" a[1] ":8443"}'
+printf 'Utente web: admin | Utente console: root\nPassword iniziale (accesso locale): '
+cat /etc/openwall/admin.password 2>/dev/null
+printf '\nInstallazione su disco: openwall-install\nReti dati: eth1 / eth2. Gestione riservata: eth0.\nVersione sperimentale. Nessun codice o firmware Fortinet incluso.\n\n'

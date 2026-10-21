@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: MIT
+# Set the real management interface before starting the service.
+# Devuan may use names such as enp1s0 or ens18 instead of eth0.
+MURUS_MANAGEMENT_INTERFACE=eth0
+# Used only when management has no IPv4 address; existing addresses are preserved.
+MURUS_MANAGEMENT_FALLBACK=192.168.56.1/24

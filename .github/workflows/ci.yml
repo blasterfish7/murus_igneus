@@ -1,0 +1,104 @@
+name: Python checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install protocol test tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends snmp snmpd
+      - name: Python syntax
+        run: python -m compileall -q src/murus_igneus
+      - name: Install configuration parser used by Devuan
+        run: python -m pip install PyYAML==6.0.2
+      - name: Static Python checks
+        run: |
+          python -m pip install ruff==0.11.13
+          python -m ruff check --select F,E9 src tests
+      - name: Migration regression tests
+        run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Shell and JavaScript syntax
+        run: |
+          sh -n packaging/devuan/build-deb.sh
+          sh -n packaging/devuan/files/murus-igneus.initd
+          sh -n packaging/devuan/files/murus-serve
+          node --check src/murus_igneus/app.js
+          node --check src/murus_igneus/management.js
+          node --check src/murus_igneus/network.js
+          node tests/test_management_ui.js
+          node tests/test_network_ui.js
+      - name: Real Chromium native configuration GUI
+        run: |
+          npm install --prefix "$RUNNER_TEMP/murus-browser" playwright-core@1.64.1 @sparticuz/chromium@153.0.0
+          node tools/prepare-browser.cjs "$RUNNER_TEMP/murus-browser"
+          MURUS_PLAYWRIGHT="$RUNNER_TEMP/murus-browser/node_modules/playwright-core" MURUS_CHROMIUM="$RUNNER_TEMP/murus-browser/bin/chromium" node tools/validate-networking-browser.cjs
+      - name: Save browser acceptance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: murus-native-browser-qa
+          path: dist/browser-networking-qa.json
+          retention-days: 14
+      - name: Build Devuan package
+        run: sh packaging/devuan/build-deb.sh
+      - name: Upload Devuan package
+        uses: actions/upload-artifact@v4
+        with:
+          name: murus-igneus-devuan-alpha
+          path: dist/*.deb
+          retention-days: 14
+
+  network-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install isolated traffic test tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nftables iproute2 conntrack dnsmasq-base
+      - name: Exercise VLAN, DHCP, DNS, DNAT and rollback with real packets
+        run: sudo env MURUS_LAB=YES unshare --mount --net --fork python3 tools/validate-native-networking.py
+      - name: Save traffic acceptance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: murus-native-networking-qa
+          path: dist/native-networking-qa.json
+          retention-days: 14
+
+  devuan-iso:
+    needs: [tests, network-runtime]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    container:
+      image: dyne/devuan:excalibur@sha256:10f6138df94c08164f300a2f35f96cd8c8966fc4948550dbe0485149d020248f
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build signed-main Devuan appliance ISO
+        run: bash tools/build-devuan-iso.sh
+      - name: Install disposable UEFI test tools
+        run: apt-get install -y --no-install-recommends qemu-system-x86 ovmf python3-pexpect
+      - name: Boot original ISO and run real network acceptance in guest
+        run: MURUS_LAB=YES python3 tools/validate-iso-networking.py
+      - name: Save ISO, checksums and package manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: murus-igneus-devuan-iso
+          path: |
+            dist/*.iso
+            dist/SHA256SUMS
+            dist/packages-devuan.tsv
+            dist/signature-status.txt
+            dist/clamav-build.log
+            dist/alpha4-iso-networking-qa.json
+          compression-level: 0
+          retention-days: 14
+
+
+
