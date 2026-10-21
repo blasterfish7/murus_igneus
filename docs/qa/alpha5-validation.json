@@ -1,0 +1,136 @@
+{
+  "source_commit": "722fc4d5aa638d651705f39a7f11b935ca6c261b",
+  "workflow_run": 39649427949,
+  "python_tests": {
+    "run": 138,
+    "passed": 138,
+    "skipped": 0
+  },
+  "browser": {
+    "success": true,
+    "chromium": "153.0.8010.0",
+    "checks": [
+      "Physical and VLAN interfaces authored in GUI with numeric tag and nullable physical tag",
+      "DNS and DHCP GUI produce complete native objects without immediate application",
+      "Full GUI-authored VLAN DHCP DNS DNAT draft passes real backend compiler and enables previewed application only",
+      "DNS health, traffic page and event filtering render controlled fixture responses",
+      "OpenAI provider GUI saves opt-in settings and never reads the stored key back",
+      "New enterprise form renders and persisted administrative event is visible",
+      "Real browser enrolls TOTP, receives secure session, reauthenticates and rejects replay",
+      "No page JavaScript exceptions"
+    ],
+    "scope": "Real Chromium and real HTTP backend compiler; runtime status responses controlled, apply disabled. Packet acceptance is tested separately."
+  },
+  "network": {
+    "success": true,
+    "checks": [
+      "VLAN tagged forwarding and TCP DNAT with no broad allow policy",
+      "DNAT source restriction rejects unauthorized source",
+      "Direct internal service access remains blocked",
+      "DNS forwarding from VLAN to controlled upstream",
+      "DNS is blocked from WAN",
+      "Real DHCP discover/offer/request/ack over VLAN, gateway and DNS options, lease file",
+      "Conntrack API parser reports actual original and DNAT reply tuples",
+      "Changed VLAN tag and manual rollback restore VLAN, addresses, DNS and DNAT",
+      "DNAT removal closes service; rollback restores publication",
+      "Unconfirmed publication removal rolls back automatically after 90 seconds, including DNS",
+      "Confirmed native settings persisted in active.json"
+    ],
+    "scope": "Isolated Linux namespace with real nftables, veth VLAN, dnsmasq, DHCP packets, DNS and TCP traffic; not ISO/hardware acceptance."
+  },
+  "enterprise": {
+    "checks": [
+      {
+        "name": "Actual nftables accepts IPsec expressions and strongSwan loads IKEv2 configuration",
+        "passed": true
+      },
+      {
+        "name": "Real IKEv2 handshake and LAN-to-LAN encrypted packets",
+        "passed": true
+      },
+      {
+        "name": "Plaintext traffic spoofing remote selector is denied",
+        "passed": true
+      },
+      {
+        "name": "Tunnel shutdown never falls back to plaintext forwarding",
+        "passed": true
+      },
+      {
+        "name": "Primary WAN selected after three successful probes; LAN NAT passes real packets",
+        "passed": true
+      },
+      {
+        "name": "WAN failure moves new LAN traffic to backup",
+        "passed": true
+      },
+      {
+        "name": "Both WANs unavailable install unreachable default",
+        "passed": true
+      },
+      {
+        "name": "Recovered preferred WAN is selected after hysteresis",
+        "passed": true
+      },
+      {
+        "name": "Stopping failover removes owned routes and policy rules",
+        "passed": true
+      }
+    ],
+    "count": 9
+  },
+  "package": {
+    "sha256": "55715d6b5031b45a8f62c6267ee5379976f840c04fdf672ce6756ba47ada2626",
+    "size": 83616,
+    "application_files_compared": 24
+  },
+  "iso": {
+    "success": true,
+    "checks": [
+      "UEFI live ISO boot and console login",
+      "Real HTTPS backend alpha.5, empty setup and native VLAN preview",
+      "Devuan ISO: VLAN tagged forwarding and TCP DNAT with no broad allow policy",
+      "Devuan ISO: DNAT source restriction rejects unauthorized source",
+      "Devuan ISO: Direct internal service access remains blocked",
+      "Devuan ISO: DNS forwarding from VLAN to controlled upstream",
+      "Devuan ISO: DNS is blocked from WAN",
+      "Devuan ISO: Real DHCP discover/offer/request/ack over VLAN, gateway and DNS options, lease file",
+      "Devuan ISO: Conntrack API parser reports actual original and DNAT reply tuples",
+      "Devuan ISO: Changed VLAN tag and manual rollback restore VLAN, addresses, DNS and DNAT",
+      "Devuan ISO: DNAT removal closes service; rollback restores publication",
+      "Devuan ISO: Unconfirmed publication removal rolls back automatically after 90 seconds, including DNS",
+      "Devuan ISO: Confirmed native settings persisted in active.json",
+      "Devuan ISO: Actual nftables accepts IPsec expressions and strongSwan loads IKEv2 configuration",
+      "Devuan ISO: Real IKEv2 handshake and LAN-to-LAN encrypted packets",
+      "Devuan ISO: Plaintext traffic spoofing remote selector is denied",
+      "Devuan ISO: Tunnel shutdown never falls back to plaintext forwarding",
+      "Devuan ISO: Primary WAN selected after three successful probes; LAN NAT passes real packets",
+      "Devuan ISO: WAN failure moves new LAN traffic to backup",
+      "Devuan ISO: Both WANs unavailable install unreachable default",
+      "Devuan ISO: Recovered preferred WAN is selected after hysteresis",
+      "Devuan ISO: Stopping failover removes owned routes and policy rules",
+      "Graceful live VM poweroff"
+    ],
+    "iso": "murus-igneus-0.3.0-alpha.5-devuan-amd64.iso",
+    "sha256": "d67e09e1917b8c489ed9537de62f94df4f49be331760ce9dce33400c302cdbb9",
+    "scope": "QEMU TCG UEFI live boot; installed product modules exercised with real packets inside isolated guest namespaces. No disk installation, Secure Boot or physical hardware test."
+  },
+  "limitations": [
+    "No real OpenAI service request or model quality acceptance",
+    "No real FortiGate/hardware interoperability test",
+    "No signed application install/rollback integration test; cryptographic verification and tampering tests passed",
+    "No HA, RBAC, TLS content inspection or full threat efficacy/performance benchmark"
+  ],
+  "previous_validation_run": 39647002618,
+  "signature_status": "Official ClamAV signature update succeeded during build.",
+  "artifact_archives": [
+    {
+      "id": 12368768328,
+      "sha256": "6834704c9dcf29b2cd5f86eaf9f4c36e7aec1dd03b2bf2c83198a920713c1ea6"
+    },
+    {
+      "id": 12368671771,
+      "sha256": "cebf548f2ac073a9da6d7cc150adeef688ee8178b228fe9c7308a9400a7c6ffa"
+    }
+  ]
+}
