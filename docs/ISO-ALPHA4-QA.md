@@ -31,9 +31,22 @@ three VirtIO NICs. No target installation disk was attached. The VM is powered o
 
 ## Download and checksums
 
-[Download the ISO artifact ZIP](https://github.com/blasterfish7/murus_igneus/actions/runs/39591605617/artifacts/12342299949),
-then extract `murus-igneus-0.3.0-alpha.4-devuan-amd64.iso`.
-The artifact expires on 2026-11-04; it is an Actions build artifact, not a new GitHub Release.
+[Download the published alpha.4 prerelease](https://github.com/blasterfish7/murus_igneus/releases/tag/v0.3.0-alpha.4).
+The ISO and DEB are attached directly, together with `SHA256SUMS`, the guide,
+package manifest, signature status and the original ISO acceptance report.
+PR #5 is merged into `main`; the release tag points to
+`ab2b29c1432eb43341f39c59f03110251238054d` with the tested runtime source unchanged.
+The publisher verified both original artifact ZIP digests, the ISO digest against
+its build manifest and embedded acceptance report, and all seven uploaded asset digests.
+
+**ISO image** SHA-256:
+
+```
+531b64addf529390517ae95afd03c18e413e2d45f10959c02708d876df7c621e
+```
+
+The original [Actions artifact ZIP](https://github.com/blasterfish7/murus_igneus/actions/runs/39591605617/artifacts/12342299949)
+remains available until 2026-11-04; release assets are independent of that expiry.
 
 The ZIP includes `SHA256SUMS` for the ISO, its embedded
 `alpha4-iso-networking-qa.json` acceptance report, package manifest and signature status.

@@ -1,3 +1,14 @@
+# Published release — 0.3.0-alpha.4
+
+PR #5 is merged into `main`. [Download the alpha.4 prerelease](https://github.com/blasterfish7/murus_igneus/releases/tag/v0.3.0-alpha.4)
+with the original verified ISO, DEB, checksums and acceptance report. The release
+tag points to merge commit `ab2b29c1432eb43341f39c59f03110251238054d`; runtime
+source is identical to the tested build commit below. The release publisher
+verified the original artifact archives, ISO manifest and embedded QA report,
+then checked every uploaded asset digest before publication.
+
+ISO SHA-256: `531b64addf529390517ae95afd03c18e413e2d45f10959c02708d876df7c621e`.
+
 # Native networking — 0.3.0-alpha.4 acceptance (2026-10-21)
 
 Build/source commit: `4808ef7fe556c0c1564a01faa7fff4d4e67aca33`.

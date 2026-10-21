@@ -50,8 +50,10 @@
     "graceful_poweroff": true,
     "artifact_url": "https://github.com/blasterfish7/murus_igneus/actions/runs/39591605617/artifacts/12342299949",
     "artifact_zip_sha256_from_github": "0cf1e67828f4a489e3a35f92a163ef42e0bfe9096d7e550458b877aabe67e52b",
-    "image_checksum_location": "SHA256SUMS inside the artifact ZIP; image digest also in alpha4-iso-networking-qa.json",
-    "official_clamav_signature_update": "succeeded during build"
+    "image_checksum_location": "SHA256SUMS release asset and original embedded ISO QA report",
+    "official_clamav_signature_update": "succeeded during build",
+    "sha256": "531b64addf529390517ae95afd03c18e413e2d45f10959c02708d876df7c621e",
+    "release_url": "https://github.com/blasterfish7/murus_igneus/releases/tag/v0.3.0-alpha.4"
   },
   "not_tested": [
     "alpha.4 disk installation and disk-only reboot",
@@ -60,5 +62,50 @@
     "physical hardware and physical switch writes",
     "complete forwarded VPN/IPS/HTTP-antivirus matrix on alpha.4",
     "real AI model quality"
-  ]
+  ],
+  "release": {
+    "url": "https://github.com/blasterfish7/murus_igneus/releases/tag/v0.3.0-alpha.4",
+    "tag": "v0.3.0-alpha.4",
+    "target_commit": "ab2b29c1432eb43341f39c59f03110251238054d",
+    "published_at": "2026-10-21T12:57:16Z",
+    "prerelease": true,
+    "publisher_run": "https://github.com/blasterfish7/murus_igneus/actions/runs/39603709947",
+    "verified_assets": [
+      {
+        "name": "alpha4-iso-networking-qa.json",
+        "bytes": 1380,
+        "sha256": "54a13b9fe46e40ad1fd955db66977066ffe76079b4031b3e96ddc54013b7d42d"
+      },
+      {
+        "name": "murus-igneus-0.3.0-alpha.4-devuan-amd64.iso",
+        "bytes": 472823808,
+        "sha256": "531b64addf529390517ae95afd03c18e413e2d45f10959c02708d876df7c621e"
+      },
+      {
+        "name": "MURUS-IGNEUS-ALPHA4-LEGGIMI.txt",
+        "bytes": 2466,
+        "sha256": "351c6ec32247246e47a542e7ed256d2fb582de70475f09ad255ea2c07c853fb0"
+      },
+      {
+        "name": "murus-igneus_0.3.0-alpha.4_all.deb",
+        "bytes": 70118,
+        "sha256": "0f1a79aa7d631876430c03155289a794994407d51c31bb069cbe0c4752d5c7c0"
+      },
+      {
+        "name": "packages-devuan.tsv",
+        "bytes": 9230,
+        "sha256": "56c8d577ca0c6636fad5693a25f117d9798fd0dea4e196e971a6cd67bf8628d9"
+      },
+      {
+        "name": "SHA256SUMS",
+        "bytes": 578,
+        "sha256": "5f27e8e8456b118e7facac5d6feabc91e651e5472d0dd687db4ec3825f11c634"
+      },
+      {
+        "name": "signature-status.txt",
+        "bytes": 57,
+        "sha256": "5db8636adba8ad2b58951db44644e4c07fa0705570adecdba0f2af969790e484"
+      }
+    ]
+  }
 }
