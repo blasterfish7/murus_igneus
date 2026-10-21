@@ -37,9 +37,9 @@ for name in dev proc sys; do
     mount --make-rslave "$root/$name"
 done
 chroot "$root" apt-get update
-chroot "$root" apt-get install -y --no-install-recommends linux-image-amd64 live-boot initramfs-tools sysvinit-core openrc ifupdown isc-dhcp-client kmod python3 python3-yaml snmp dnsmasq-base nftables iproute2 openssl conntrack wireguard-tools suricata suricata-update clamav clamav-daemon clamav-freshclam rsync fdisk parted dosfstools e2fsprogs grub-pc-bin grub-efi-amd64-bin grub2-common ca-certificates curl
+chroot "$root" apt-get install -y --no-install-recommends linux-image-amd64 live-boot initramfs-tools sysvinit-core openrc ifupdown isc-dhcp-client kmod python3 python3-yaml snmp dnsmasq-base nftables iproute2 openssl conntrack wireguard-tools strongswan-charon strongswan-swanctl libcharon-extra-plugins libstrongswan-standard-plugins iputils-ping dpkg-repack suricata suricata-update clamav clamav-daemon clamav-freshclam rsync fdisk parted dosfstools e2fsprogs grub-pc-bin grub-efi-amd64-bin grub2-common ca-certificates curl
 bash "$project/packaging/devuan/build-deb.sh" "$out"
-cp "$out/murus-igneus_0.3.0~alpha.4_all.deb" "$root/tmp/murus.deb"
+cp "$out/murus-igneus_0.3.0~alpha.5_all.deb" "$root/tmp/murus.deb"
 chroot "$root" dpkg -i /tmp/murus.deb
 rm "$root/tmp/murus.deb"
 # A signed ClamAV database can be distributed with the lab ISO when its official
@@ -76,8 +76,10 @@ touch "$root/etc/murus_igneus/live-image"
 printf '\nT0:2345:respawn:/sbin/agetty -L ttyS0 115200 vt100\n' >> "$root/etc/inittab"
 chroot "$root" rc-update add murus-igneus default
 # Murus owns these processes and starts them only after validated configuration.
-for service in suricata clamav-daemon clamav-freshclam; do
-    chroot "$root" update-rc.d "$service" disable
+for service in suricata clamav-daemon clamav-freshclam ipsec strongswan strongswan-starter; do
+    if [[ -f "$root/etc/init.d/$service" ]]; then
+        chroot "$root" update-rc.d "$service" disable
+    fi
 done
 # Enable the network service at boot; package defaults are retained for other base services.
 chroot "$root" update-rc.d networking defaults
@@ -103,13 +105,13 @@ set timeout=2
 serial --unit=0 --speed=115200
 terminal_input console serial
 terminal_output console serial
-menuentry 'Murus Igneus 0.3.0-alpha.4 / Devuan 6 (live + web installer)' {
+menuentry 'Murus Igneus 0.3.0-alpha.5 / Devuan 6 (live + web installer)' {
   linux /boot/vmlinuz boot=live ip=frommedia net.ifnames=0 console=tty0 console=ttyS0,115200
   initrd /boot/initrd
 }
 GRUB
-grub-mkrescue --compress=xz -o "$out/murus-igneus-0.3.0-alpha.4-devuan-amd64.iso" "$iso"
-(cd "$out" && sha256sum murus-igneus-0.3.0-alpha.4-devuan-amd64.iso > SHA256SUMS)
+grub-mkrescue --compress=xz -o "$out/murus-igneus-0.3.0-alpha.5-devuan-amd64.iso" "$iso"
+(cd "$out" && sha256sum murus-igneus-0.3.0-alpha.5-devuan-amd64.iso > SHA256SUMS)
 echo 'MURUS ISO BUILD COMPLETE'
 
 

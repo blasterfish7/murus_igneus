@@ -9,10 +9,10 @@ output=$(CDPATH='' cd -- "$output" && pwd)
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT HUP INT TERM
 install -d "$stage/DEBIAN" "$stage/usr/lib/murus-igneus" "$stage/usr/sbin" "$stage/etc/init.d" "$stage/etc/default" "$stage/usr/share/doc/murus-igneus" "$stage/etc/sysctl.d"
-for file in __init__.py server.py configuration.py migration.py security.py avproxy.py jobs.py installer.py networking.py traffic.py network.js tasks.py assistant.py switches.py management.js index.html app.js style.css LICENSE-MIT; do
+for file in __init__.py server.py configuration.py migration.py security.py avproxy.py jobs.py installer.py networking.py traffic.py eventlog.py authentication.py enterprise.py enterprise.js updates.py network.js tasks.py assistant.py switches.py management.js index.html app.js style.css LICENSE-MIT; do
     install -m 0644 "$root/src/murus_igneus/$file" "$stage/usr/lib/murus-igneus/$file"
 done
-for file in murus-serve murus-prepare murus-info; do
+for file in murus-serve murus-prepare murus-info murus-update; do
     install -m 0755 "$root/packaging/devuan/files/$file" "$stage/usr/sbin/$file"
 done
 install -m 0755 "$root/packaging/devuan/files/murus-igneus.initd" "$stage/etc/init.d/murus-igneus"
@@ -23,14 +23,15 @@ install -m 0644 "$root/src/murus_igneus/LICENSE-MIT" "$stage/usr/share/doc/murus
 install -m 0644 "$root/docs/DEVUAN.md" "$stage/usr/share/doc/murus-igneus/DEVUAN.md"
 install -m 0644 "$root/docs/AI-SWITCHES.md" "$stage/usr/share/doc/murus-igneus/AI-SWITCHES.md"
 install -m 0644 "$root/docs/NATIVE-NETWORKING.md" "$stage/usr/share/doc/murus-igneus/NATIVE-NETWORKING.md"
+install -m 0644 "$root/docs/ALPHA5.md" "$stage/usr/share/doc/murus-igneus/ALPHA5.md"
 cat > "$stage/DEBIAN/control" <<'EOF'
 Package: murus-igneus
-Version: 0.3.0~alpha.4
+Version: 0.3.0~alpha.5
 Section: net
 Priority: optional
 Architecture: all
 Maintainer: Murus Igneus contributors
-Depends: python3 (>= 3.11), nftables, iproute2, openssl, conntrack, kmod, wireguard-tools, suricata, suricata-update, clamav, clamav-daemon, clamav-freshclam, python3-yaml, snmp, dnsmasq-base, rsync, fdisk, parted, dosfstools, e2fsprogs, grub-pc-bin, grub-efi-amd64-bin, grub2-common, openrc, init-system-helpers
+Depends: python3 (>= 3.11), nftables, iproute2, openssl, conntrack, kmod, wireguard-tools, strongswan-charon, strongswan-swanctl, libcharon-extra-plugins, libstrongswan-standard-plugins, iputils-ping, dpkg-repack, ca-certificates, suricata, suricata-update, clamav, clamav-daemon, clamav-freshclam, python3-yaml, snmp, dnsmasq-base, rsync, fdisk, parted, dosfstools, e2fsprogs, grub-pc-bin, grub-efi-amd64-bin, grub2-common, openrc, init-system-helpers
 Description: Experimental IPv4 firewall management for Devuan 6 Excalibur
  Independent configuration editor and conservative configuration importer.
  Includes an OpenRC service. Includes VPN, IPS, HTTP antivirus, local AI connector and SNMP switch management.
@@ -70,6 +71,6 @@ if [ "${1:-}" = configure ]; then
 fi
 EOF
 chmod 0755 "$stage/DEBIAN/preinst" "$stage/DEBIAN/prerm" "$stage/DEBIAN/postinst"
-dpkg-deb --root-owner-group --build "$stage" "$output/murus-igneus_0.3.0~alpha.4_all.deb"
+dpkg-deb --root-owner-group --build "$stage" "$output/murus-igneus_0.3.0~alpha.5_all.deb"
 
 

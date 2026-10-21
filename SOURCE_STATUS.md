@@ -1,3 +1,16 @@
+# Alpha.5 acceptance — 2026-10-21
+
+Candidate source: `55ec4ea84c58f0c036cd50ac9a7266a7c96fdd38`.
+[CI and original ISO acceptance passed](https://github.com/blasterfish7/murus_igneus/actions/runs/39651874250): 138 Python tests without skips, 8 Chromium checks, 11 native and 9 enterprise packet checks; 24 checks inside the original UEFI live ISO. Includes real appliance HTTPS IPsec apply/rollback, beyond the isolated protocol laboratory. All 24 packaged application files match the tested source.
+
+Adds optional OpenAI Responses integration, corrected AI context, IKEv2/strongSwan selector VPN, static dual-WAN failover, TOTP, bounded persistent packet/audit history and offline signed application package update tooling. No Fortinet code or firmware.
+
+ISO SHA-256: `7bbceee7a1bdde8e47b909c46c22e2effa1c9c5f1836dcf6f33239c8c659fc81`.
+
+Detailed scope, evidence and limitations: [ALPHA5](docs/ALPHA5.md), [ISO QA](docs/ISO-ALPHA5-QA.md), [machine-readable report](docs/qa/alpha5-validation.json). The signed updater does not update the whole OS; no live OpenAI request, real FortiGate interoperability or alpha.5 disk installation is claimed.
+
+---
+
 # Published release — 0.3.0-alpha.4
 
 PR #5 is merged into `main`. [Download the alpha.4 prerelease](https://github.com/blasterfish7/murus_igneus/releases/tag/v0.3.0-alpha.4)
@@ -254,5 +267,6 @@ preserved alongside repository licensing. See docs/DEVUAN.md and docs/PROVENANCE
 tools/validate-devuan-runtime.py replaces configuration and creates namespaces:
 run it only in an explicitly flagged disposable live VM, never on a real network.
 It does not erase a disk.
+
 
 

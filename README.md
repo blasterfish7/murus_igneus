@@ -13,3 +13,5 @@ are available in alpha.2. The model/runtime must be installed separately. No For
 See [AI and switch setup](docs/AI-SWITCHES.md), [alpha features](README-ALPHA.md), [Devuan build/install guide](docs/DEVUAN.md)
 and [verification status](SOURCE_STATUS.md) before using a build.
 
+
+Sviluppo alpha.5: [nuove funzioni, uso e limiti](docs/ALPHA5.md). La release alpha.4 resta il download pubblicato fino a nuovo collaudo.
