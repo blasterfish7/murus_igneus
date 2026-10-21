@@ -35,6 +35,8 @@ if '--agent' in sys.argv:
                 enterprise.stop(); result = {'stopped':True}
             print(json.dumps({'ok':True,'result':result}),flush=True)
         except Exception as exc:
+            if (enterprise.RUN/'charon.log').exists():
+                print((enterprise.RUN/'charon.log').read_text()[-6000:],file=sys.stderr,flush=True)
             print(json.dumps({'ok':False,'error':str(exc)}),flush=True)
     enterprise.stop()
     raise SystemExit()

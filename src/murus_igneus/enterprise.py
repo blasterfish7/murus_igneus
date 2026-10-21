@@ -195,15 +195,17 @@ def ipsec_start(settings, interfaces):
     RUN.mkdir(mode=0o700, parents=True, exist_ok=True)
     for name, content in [('swanctl.conf', swan_config(settings, interfaces)), ('charon.conf', '''charon {
  install_routes = no
+ load_modular = yes
+ pid_file = @RUN@/charon.pid
  plugins {
   include /etc/strongswan.d/charon/*.conf
   vici {
-   socket = unix:///run/murus-igneus/charon.vici
+   socket = unix://@RUN@/charon.vici
   }
  }
 }
 ''')]:
-        path = RUN / name; path.write_text(content); path.chmod(0o600)
+        path = RUN / name; path.write_text(content.replace('@RUN@',str(RUN))); path.chmod(0o600)
     import os
     environment = {**os.environ, 'STRONGSWAN_CONF': str(RUN / 'charon.conf')}
     DAEMON_LOG = (RUN / 'charon.log').open('a')
