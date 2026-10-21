@@ -193,7 +193,7 @@
         else {
           el('ai-state').textContent = 'Risposta AI: controlla le indicazioni prima di usarle. Nessuna modifica applicata.';
           const f = task.result.facts;
-          const facts = f ? `Dati della bozza verificati dal motore: ${f.policy_count} policy; ${f.dnat_grants || 0} autorizzazioni DNAT; ${f.vlan_count || 0} VLAN; transito senza autorizzazione bloccato; VPN ${f.vpn_enabled ? 'abilitata' : 'disabilitata'}; IPS ${f.ips_enabled ? 'abilitato' : 'disabilitato'}; antivirus HTTP ${f.http_antivirus_enabled ? 'abilitato' : 'disabilitato'}; antivirus HTTPS non disponibile.\n\nRisposta AI (può contenere errori):\n` : '';
+          const facts = f ? `Dati della bozza verificati dal motore: ${f.policy_count} policy; ${f.dnat_grants || 0} autorizzazioni DNAT; ${f.vlan_count || 0} VLAN; transito senza autorizzazione bloccato; WireGuard ${f.vpn_enabled ? 'abilitata' : 'disabilitata'}; ${f.ipsec_grants || 0} tunnel IPsec abilitati; failover WAN ${f.wan_failover ? 'abilitato' : 'disabilitato'}; IPS ${f.ips_enabled ? 'abilitato' : 'disabilitato'}; antivirus HTTP ${f.http_antivirus_enabled ? 'abilitato' : 'disabilitato'}; antivirus HTTPS non disponibile.\n\nRisposta AI (può contenere errori):\n` : '';
           el('ai-answer').textContent = facts + (task.result.answer || task.result.message || '');
           aiProposal = aiDraft === null ? null : task.result.proposal;
           if (task.result.proposal && aiDraft === null) el('ai-answer').textContent += '\n\nProposta di un’altra sessione: ripeti la domanda da questa bozza per caricarla.';

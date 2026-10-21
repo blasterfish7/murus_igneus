@@ -199,7 +199,7 @@ def ipsec_start(settings, interfaces):
  plugins {
   include /etc/strongswan.d/charon/*.conf
   vici {
-   socket = unix://@RUN@/charon.vici
+   socket = "unix://@RUN@/charon.vici"
   }
  }
 }

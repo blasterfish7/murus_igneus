@@ -263,6 +263,8 @@ def openai_request(settings, state, path, data=None):
     if not key_path.exists():
         raise ValueError('Configurare una chiave API OpenAI sul firewall')
     api_key = key_path.read_text().strip()
+    if not re.fullmatch(r'[A-Za-z0-9_-]{20,300}', api_key):
+        raise ValueError('Chiave OpenAI salvata non valida: configurarla nuovamente')
     conn = http.client.HTTPSConnection('api.openai.com', 443, timeout=120)
     try:
         conn.request('GET' if data is None else 'POST', path,

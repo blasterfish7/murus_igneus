@@ -61,7 +61,7 @@ csrf=s['csrf'];c=api('configuration')['configuration'];assert 'dns' in c and 'dh
 c['interfaces']=[{'name':'TRUNK','device':'eth2','address':''},{'name':'LAN','device':'eth2.20','address':'198.51.100.1/24','parent':'eth2','vlan_id':20}]
 p=api('configuration/preview',{'configuration':c});assert p['ready'],p
 assert p['network_ops'][0]['kind']=='vlan',p
-print('ISO_HTTPS_ALPHA4_NATIVE_VLAN_PREVIEW_OK')
+print('ISO_HTTPS_ALPHA5_NATIVE_VLAN_PREVIEW_OK')
 '''
         encoded = base64.b64encode(probe.encode()).decode()
         command("python3 -c \"import base64;exec(base64.b64decode('" + encoded + "'))\"")
@@ -77,6 +77,16 @@ print('ISO_HTTPS_ALPHA4_NATIVE_VLAN_PREVIEW_OK')
         assert runtime['success'], output
         checks += ['Devuan ISO: ' + item for item in runtime['checks']]
         print('PASS real packet suite on original ISO: ' + str(len(runtime['checks'])) + ' checks', flush=True)
+        payload = base64.b64encode(gzip.compress((ROOT / 'tools/validate-enterprise-runtime.py').read_bytes())).decode()
+        command(': > /tmp/murus-qa/enterprise.b64')
+        for pos in range(0, len(payload), 1000):
+            command("printf '%s' '" + payload[pos:pos + 1000] + "' >> /tmp/murus-qa/enterprise.b64")
+        command("python3 -c \"import base64,gzip;from pathlib import Path;Path('/tmp/murus-qa/tools/validate-enterprise-runtime.py').write_bytes(gzip.decompress(base64.b64decode(Path('/tmp/murus-qa/enterprise.b64').read_bytes())))\"")
+        command('MURUS_LAB=YES unshare --mount --net --fork python3 /tmp/murus-qa/tools/validate-enterprise-runtime.py', timeout=360)
+        enterprise_report = json.loads(re.search(r'MIQA_ENTERPRISE=(\{[^\r\n]+\})', command("python3 -c \"import json;print('MIQA_ENTERPRISE='+json.dumps(json.load(open('/tmp/murus-qa/dist/enterprise-runtime-qa.json'))))\"")).group(1))
+        assert enterprise_report['count'] == 9, enterprise_report
+        checks += ['Devuan ISO: ' + item['name'] for item in enterprise_report['checks']]
+        print('PASS real IKEv2 and dual WAN suite on original ISO: 9 checks', flush=True)
         child.sendline('poweroff'); child.expect(pexpect.EOF, timeout=300)
         checks.append('Graceful live VM poweroff'); print('PASS ' + checks[-1], flush=True)
         with iso.open('rb') as file:
