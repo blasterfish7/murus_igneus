@@ -1,0 +1,64 @@
+{
+  "date": "2026-10-21",
+  "source_commit": "4808ef7fe556c0c1564a01faa7fff4d4e67aca33",
+  "workflow_run": "https://github.com/blasterfish7/murus_igneus/actions/runs/39591605617",
+  "python_ci": {
+    "passed": 124,
+    "skipped": 0
+  },
+  "packaging": {
+    "application_files_compared": 19,
+    "byte_for_byte_source_match": true,
+    "deb_artifact_zip_sha256": "7e876b869acf56c1ff4b7de98662ec9bc691d4f0e0580d520a8402be670a8675"
+  },
+  "browser": {
+    "success": true,
+    "chromium": "153.0.8010.0",
+    "checks": [
+      "Physical and VLAN interfaces authored in GUI with numeric tag and nullable physical tag",
+      "DNS and DHCP GUI produce complete native objects without immediate application",
+      "Full GUI-authored VLAN DHCP DNS DNAT draft passes real backend compiler and enables previewed application only",
+      "DNS health, traffic page and event filtering render controlled fixture responses",
+      "No page JavaScript exceptions"
+    ],
+    "scope": "Real Chromium and real HTTP backend compiler; runtime status responses controlled, apply disabled. Packet acceptance is tested separately."
+  },
+  "native_linux": {
+    "success": true,
+    "checks": [
+      "VLAN tagged forwarding and TCP DNAT with no broad allow policy",
+      "DNAT source restriction rejects unauthorized source",
+      "Direct internal service access remains blocked",
+      "DNS forwarding from VLAN to controlled upstream",
+      "DNS is blocked from WAN",
+      "Real DHCP discover/offer/request/ack over VLAN, gateway and DNS options, lease file",
+      "Conntrack API parser reports actual original and DNAT reply tuples",
+      "Changed VLAN tag and manual rollback restore VLAN, addresses, DNS and DNAT",
+      "DNAT removal closes service; rollback restores publication",
+      "Unconfirmed publication removal rolls back automatically after 90 seconds, including DNS",
+      "Confirmed native settings persisted in active.json"
+    ],
+    "scope": "Isolated Linux namespace with real nftables, veth VLAN, dnsmasq, DHCP packets, DNS and TCP traffic; not ISO/hardware acceptance."
+  },
+  "iso": {
+    "success": true,
+    "evidence": "Successful CI job 119194609980 and its PASS markers",
+    "filename": "murus-igneus-0.3.0-alpha.4-devuan-amd64.iso",
+    "uefi_live_boot": true,
+    "https_backend_and_vlan_preview": true,
+    "real_packet_checks_in_guest": 11,
+    "graceful_poweroff": true,
+    "artifact_url": "https://github.com/blasterfish7/murus_igneus/actions/runs/39591605617/artifacts/12342299949",
+    "artifact_zip_sha256_from_github": "0cf1e67828f4a489e3a35f92a163ef42e0bfe9096d7e550458b877aabe67e52b",
+    "image_checksum_location": "SHA256SUMS inside the artifact ZIP; image digest also in alpha4-iso-networking-qa.json",
+    "official_clamav_signature_update": "succeeded during build"
+  },
+  "not_tested": [
+    "alpha.4 disk installation and disk-only reboot",
+    "Secure Boot",
+    "BIOS boot",
+    "physical hardware and physical switch writes",
+    "complete forwarded VPN/IPS/HTTP-antivirus matrix on alpha.4",
+    "real AI model quality"
+  ]
+}

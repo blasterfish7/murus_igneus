@@ -1,16 +1,30 @@
-# Native networking — 0.3.0-alpha.4 (work in validation)
+# Native networking — 0.3.0-alpha.4 acceptance (2026-10-21)
 
-Adds VLAN interfaces, DHCP pools, local DNS forwarding, explicit TCP/UDP port
-forwarding and a bounded read-only connection/event view. Native settings share
-the existing apply/confirm/rollback transaction and are preserved by installation.
-Only independent application code and open-source system components are used.
-See [native networking](docs/NATIVE-NETWORKING.md) for ordering, limits and tests.
+Build/source commit: `4808ef7fe556c0c1564a01faa7fff4d4e67aca33`.
+[CI build and acceptance succeeded](https://github.com/blasterfish7/murus_igneus/actions/runs/39591605617).
 
-Local regression suite: 124 tests; three protocol tests require Net-SNMP tools
-that are absent locally. CI executes those tools and a new real-packet namespace
-acceptance job before producing the alpha.4 ISO. No alpha.4 ISO boot/install or
-physical-hardware acceptance has yet been recorded. The following alpha.3 record
-is historical and must not be interpreted as an alpha.4 test result.
+Adds native VLAN interfaces, DHCP pools, local DNS forwarding, explicit TCP/UDP
+port forwarding and a bounded read-only connection/event view. Native settings
+share the existing apply/confirm/90-second rollback transaction. The installer
+copies the new lease directory alongside the existing confirmed configuration.
+Independent code and open-source system components only; no Fortinet code/firmware.
+
+Validation: 124 Python CI tests passed without skips; static/syntax and both Node
+UI regression suites passed; five real Chromium GUI checks passed; eleven real
+namespace traffic checks passed both on the runner and inside the generated ISO.
+The ISO completed UEFI live boot, real HTTPS native preview and graceful poweroff
+(14 VM acceptance checks total). All 19 application files in the CI DEB matched
+local source byte-for-byte. Official ClamAV signature download succeeded in build.
+
+The alpha.4 image remains experimental. Disk installation/disk-only reboot,
+physical hardware, BIOS/Secure Boot and the full forwarded VPN/IPS/antivirus
+matrix were not retested for this version. Native feature support does not imply
+FortiGate VLAN/VIP/DHCP import support. The historical alpha.3 record below applies
+only to alpha.3.
+
+See [native networking](docs/NATIVE-NETWORKING.md),
+[alpha.4 acceptance](docs/ISO-ALPHA4-QA.md) and
+[structured results](docs/qa/alpha4-validation.json).
 
 # ISO alpha.3 acceptance — 2026-10-21
 
