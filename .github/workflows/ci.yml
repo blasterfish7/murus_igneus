@@ -32,6 +32,7 @@ jobs:
           node --check src/murus_igneus/app.js
           node --check src/murus_igneus/management.js
           node --check src/murus_igneus/network.js
+          node --check src/murus_igneus/enterprise.js
           node tests/test_management_ui.js
           node tests/test_network_ui.js
       - name: Real Chromium native configuration GUI
@@ -70,8 +71,25 @@ jobs:
           path: dist/native-networking-qa.json
           retention-days: 14
 
+  enterprise-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install actual IKEv2 and network test tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nftables iproute2 iputils-ping strongswan-charon strongswan-swanctl libcharon-extra-plugins
+      - name: Exercise IKEv2 and WAN failover using real packets
+        run: sudo env MURUS_LAB=YES unshare --mount --net --fork python3 tools/validate-enterprise-runtime.py
+      - name: Save enterprise acceptance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: murus-enterprise-runtime-qa
+          path: dist/enterprise-runtime-qa.json
+          retention-days: 14
+
   devuan-iso:
-    needs: [tests, network-runtime]
+    needs: [tests, network-runtime, enterprise-runtime]
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -96,7 +114,7 @@ jobs:
             dist/packages-devuan.tsv
             dist/signature-status.txt
             dist/clamav-build.log
-            dist/alpha4-iso-networking-qa.json
+            dist/alpha5-iso-networking-qa.json
           compression-level: 0
           retention-days: 14
 

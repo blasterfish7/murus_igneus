@@ -138,10 +138,12 @@ _compile_base=compile_config
 def compile_config(config,management='eth0'):
     import copy
     try:
-        from . import security, networking
+        from . import security, networking, enterprise
     except ImportError:
-        import security, networking
+        import security, networking, enterprise
     if not isinstance(config,dict):raise Error('Configurazione non valida')
+    extensions=enterprise.validate(config,management)
+    config={k:v for k,v in config.items() if k not in extensions}
     settings=security.validate(config,management)
     original=copy.deepcopy(config);prepared,interfaces,services,vlans=networking.prepare(original,management)
     base={k:v for k,v in prepared.items() if k not in ('vpn','utm')}
@@ -166,6 +168,8 @@ def compile_config(config,management='eth0'):
     plan['configuration'].update(settings);plan['security']=settings
     plan['nftables']=security.decorate(plan['nftables'],settings)
     networking.decorate(plan,interfaces,services,vlans)
+    plan['configuration'].update(extensions);plan['enterprise']=extensions
+    plan['nftables']=enterprise.decorate(plan['nftables'],extensions,interfaces)
     plan['version']=VERSION
     return plan
 

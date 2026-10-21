@@ -5,7 +5,7 @@ import json
 import re
 import shlex
 
-VERSION='0.3.0-alpha.4'  # single runtime source; __init__.py must match (see tests/test_hardening.py)
+VERSION='0.3.0-alpha.5'  # single runtime source; __init__.py must match (see tests/test_hardening.py)
 
 class Error(ValueError): pass
 

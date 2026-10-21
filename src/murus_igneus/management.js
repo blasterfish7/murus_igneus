@@ -7,14 +7,18 @@
     section.innerHTML = markup; container.append(section);
   };
   page('assistant-page', `
-    <p class="eyebrow">ASSISTENTE LOCALE</p><h2>AI per la tua rete</h2>
+    <p class="eyebrow">ASSISTENTE AI</p><h2>AI per la tua rete</h2>
     <p>Analizza la bozza e la telemetria degli switch. Le proposte passano nell’editor e richiedono verifica e conferma.</p>
-    <aside>Serve Ollama con un modello Qwen3 già installato, sul firewall o su un server della LAN.
-    Il modello non è incluso nella ISO. Configura il server in modalità solo locale.
-    La bozza, la domanda e la telemetria saranno inviate all’indirizzo qui indicato.</aside>
+    <aside>Ollama usa un modello Qwen3 installato nella LAN, non incluso nella ISO. OpenAI è un servizio esterno opzionale: riceverà domanda, bozza e telemetria selezionata. Le credenziali strutturate vengono rimosse, ma IP, nomi e testo libero possono essere riservati. Verifica i dati prima di inviarli.</aside>
     <form id="ai-settings"><label><input id="ai-enabled" type="checkbox"> Abilita assistente</label>
-      <label>Server Ollama (IPv4 privato)<input id="ai-endpoint" required placeholder="http://192.168.10.10:11434"></label>
-      <label>Modello locale<select id="ai-model"></select></label>
+      <label>Provider<select id="ai-provider"><option value="ollama">Ollama locale</option><option value="openai">OpenAI API</option></select></label>
+      <div id="ai-local"><label>Server Ollama (IPv4 privato)<input id="ai-endpoint" required placeholder="http://192.168.10.10:11434"></label>
+      <label>Modello locale<select id="ai-model"></select></label></div>
+      <div id="ai-cloud" hidden><label>Modello OpenAI<input id="ai-cloud-model" maxlength="100" placeholder="ID del modello disponibile nel tuo progetto"></label>
+      <label>Chiave API (vuoto: conserva quella salvata)<input id="ai-api-key" type="password" autocomplete="new-password"></label><p id="ai-key-state"></p>
+      <label><input id="ai-delete-key" type="checkbox"> Elimina la chiave salvata</label>
+      <label><input id="ai-cloud-consent" type="checkbox"> Autorizzo l’invio dei dati selezionati a OpenAI e l’uso della quota API</label>
+      <label>Massimo token di risposta<input id="ai-max-tokens" type="number" min="256" max="8192" value="2048"></label></div>
       <div class="actions"><button>Salva impostazioni AI</button><button type="button" id="ai-check" class="secondary">Verifica modello</button></div>
     </form><p id="ai-connection" role="status"></p>
     <form id="ai-question-form"><label>Domanda<textarea id="ai-question" maxlength="4000" rows="4" required placeholder="Spiegami quali reti possono accedere a Internet e segnala le regole troppo ampie."></textarea></label>
@@ -56,10 +60,20 @@
 
   let aiJob = null, aiKind = '', aiProposal = null, aiDraft = null, swJob = null, swKind = '', selected = null, devices = [], portPlan = null;
   function aiSettings(data) {
-    el('ai-enabled').checked = data.settings.enabled; el('ai-endpoint').value = data.settings.endpoint;
+    el('ai-enabled').checked = data.settings.enabled; el('ai-provider').value = data.settings.provider || 'ollama';
+    el('ai-endpoint').value = data.settings.provider === 'openai' ? 'http://127.0.0.1:11434' : data.settings.endpoint;
+    el('ai-cloud-model').value = data.settings.provider === 'openai' ? data.settings.model : '';
+    el('ai-cloud-consent').checked = !!data.settings.cloud_consent; el('ai-max-tokens').value = data.settings.max_output_tokens || 2048;
+    el('ai-key-state').textContent = data.settings.key_configured ? 'Chiave presente sul firewall' : 'Nessuna chiave configurata';
+    el('ai-api-key').value = ''; el('ai-delete-key').checked = false; providerFields();
     el('ai-model').replaceChildren(...data.models.map(m => new Option(m, m)));
-    el('ai-model').value = data.settings.model;
+    el('ai-model').value = data.settings.provider === 'openai' ? 'qwen3:4b' : data.settings.model;
   }
+  function providerFields() {
+    const cloud = el('ai-provider').value === 'openai';
+    el('ai-cloud').hidden = !cloud; el('ai-local').hidden = cloud; el('ai-endpoint').required = !cloud; el('ai-cloud-model').required = cloud;
+  }
+  el('ai-provider').onchange = providerFields;
   async function openAI() {
     const data = await api('assistant'); aiSettings(data); show('assistant-page');
     if (data.task?.state === 'running') {
@@ -74,7 +88,12 @@
   el('nav').append(button('Assistente AI', () => openAI().catch(error)), button('Switch locali', () => { show('switches-page'); refreshSwitches().catch(error); }));
   el('ai-settings').onsubmit = async e => {
     e.preventDefault(); try {
-      await api('assistant/settings', { enabled: el('ai-enabled').checked, endpoint: el('ai-endpoint').value.trim(), model: el('ai-model').value });
+      const cloud = el('ai-provider').value === 'openai';
+      const settings = { enabled: el('ai-enabled').checked, provider: el('ai-provider').value, endpoint: el('ai-endpoint').value.trim(),
+        model: cloud ? el('ai-cloud-model').value.trim() : el('ai-model').value, cloud_consent: el('ai-cloud-consent').checked,
+        max_output_tokens: Number(el('ai-max-tokens').value), delete_key: el('ai-delete-key').checked };
+      if (el('ai-api-key').value) settings.api_key = el('ai-api-key').value;
+      await api('assistant/settings', settings); el('ai-api-key').value = ''; el('ai-delete-key').checked = false;
       el('ai-connection').textContent = 'Impostazioni salvate. Verifica la disponibilità del modello.';
     } catch (exc) { error(exc); }
   };
@@ -89,7 +108,7 @@
     try {
       const task = await api('assistant/ask', { question: el('ai-question').value, configuration: config, include_logs: el('ai-logs').checked, allow_proposal: el('ai-allow-proposal').checked });
       aiDraft = submittedDraft; aiProposal = null; el('ai-proposal-panel').hidden = true;
-      aiJob = task.id; aiKind = 'ask'; el('ai-state').textContent = 'Il modello locale sta elaborando…'; el('ai-answer').textContent = ''; el('ai-send').disabled = true;
+      aiJob = task.id; aiKind = 'ask'; el('ai-state').textContent = 'Il modello sta elaborando…'; el('ai-answer').textContent = ''; el('ai-send').disabled = true;
     } catch (exc) { el('ai-send').disabled = false; error(exc); }
   };
   el('ai-use-proposal').onclick = () => {
@@ -174,7 +193,7 @@
         else {
           el('ai-state').textContent = 'Risposta AI: controlla le indicazioni prima di usarle. Nessuna modifica applicata.';
           const f = task.result.facts;
-          const facts = f ? `Dati della bozza verificati dal motore: ${f.policy_count} policy; transito senza corrispondenza bloccato; VPN ${f.vpn_enabled ? 'abilitata' : 'disabilitata'}; IPS ${f.ips_enabled ? 'abilitato' : 'disabilitato'}; antivirus HTTP ${f.http_antivirus_enabled ? 'abilitato' : 'disabilitato'}; antivirus HTTPS non disponibile.\n\nRisposta AI (può contenere errori):\n` : '';
+          const facts = f ? `Dati della bozza verificati dal motore: ${f.policy_count} policy; ${f.dnat_grants || 0} autorizzazioni DNAT; ${f.vlan_count || 0} VLAN; transito senza autorizzazione bloccato; VPN ${f.vpn_enabled ? 'abilitata' : 'disabilitata'}; IPS ${f.ips_enabled ? 'abilitato' : 'disabilitato'}; antivirus HTTP ${f.http_antivirus_enabled ? 'abilitato' : 'disabilitato'}; antivirus HTTPS non disponibile.\n\nRisposta AI (può contenere errori):\n` : '';
           el('ai-answer').textContent = facts + (task.result.answer || task.result.message || '');
           aiProposal = aiDraft === null ? null : task.result.proposal;
           if (task.result.proposal && aiDraft === null) el('ai-answer').textContent += '\n\nProposta di un’altra sessione: ripeti la domanda da questa bozza per caricarla.';
