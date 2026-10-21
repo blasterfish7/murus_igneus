@@ -1,6 +1,6 @@
 {
-  "source_commit": "722fc4d5aa638d651705f39a7f11b935ca6c261b",
-  "workflow_run": 39649427949,
+  "source_commit": "55ec4ea84c58f0c036cd50ac9a7266a7c96fdd38",
+  "workflow_run": 39651874250,
   "python_tests": {
     "run": 138,
     "passed": 138,
@@ -80,8 +80,8 @@
     "count": 9
   },
   "package": {
-    "sha256": "55715d6b5031b45a8f62c6267ee5379976f840c04fdf672ce6756ba47ada2626",
-    "size": 83616,
+    "sha256": "a8e2a8434da887315a5b8795b3a6beec8ae0e5ef7b8950d6ba4cafb643765776",
+    "size": 83680,
     "application_files_compared": 24
   },
   "iso": {
@@ -89,6 +89,7 @@
     "checks": [
       "UEFI live ISO boot and console login",
       "Real HTTPS backend alpha.5, empty setup and native VLAN preview",
+      "Real appliance HTTPS preview/apply starts owned strongSwan and rollback stops it",
       "Devuan ISO: VLAN tagged forwarding and TCP DNAT with no broad allow policy",
       "Devuan ISO: DNAT source restriction rejects unauthorized source",
       "Devuan ISO: Direct internal service access remains blocked",
@@ -112,7 +113,7 @@
       "Graceful live VM poweroff"
     ],
     "iso": "murus-igneus-0.3.0-alpha.5-devuan-amd64.iso",
-    "sha256": "d67e09e1917b8c489ed9537de62f94df4f49be331760ce9dce33400c302cdbb9",
+    "sha256": "7bbceee7a1bdde8e47b909c46c22e2effa1c9c5f1836dcf6f33239c8c659fc81",
     "scope": "QEMU TCG UEFI live boot; installed product modules exercised with real packets inside isolated guest namespaces. No disk installation, Secure Boot or physical hardware test."
   },
   "limitations": [
@@ -125,12 +126,12 @@
   "signature_status": "Official ClamAV signature update succeeded during build.",
   "artifact_archives": [
     {
-      "id": 12368768328,
-      "sha256": "6834704c9dcf29b2cd5f86eaf9f4c36e7aec1dd03b2bf2c83198a920713c1ea6"
+      "id": 12370925454,
+      "sha256": "a80f9653c149e93e1e9c44d3b9ed5ca669776a6d0f9e1b1bda46dbdcbbfbe1d3"
     },
     {
-      "id": 12368671771,
-      "sha256": "cebf548f2ac073a9da6d7cc150adeef688ee8178b228fe9c7308a9400a7c6ffa"
+      "id": 12368724058,
+      "sha256": "71edc2ff80a1168ac401bb525ee959bfe0243288b9f804faba40d48167312772"
     }
   ]
 }

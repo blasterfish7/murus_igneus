@@ -1,7 +1,7 @@
 # Collaudo alpha.5
 
-Build e test del commit `722fc4d5aa638d651705f39a7f11b935ca6c261b`:
-https://github.com/blasterfish7/murus_igneus/actions/runs/39649427949
+Build e test del commit `55ec4ea84c58f0c036cd50ac9a7266a7c96fdd38`:
+https://github.com/blasterfish7/murus_igneus/actions/runs/39651874250
 
 ## Verifiche completate
 
@@ -14,9 +14,9 @@ https://github.com/blasterfish7/murus_igneus/actions/runs/39649427949
 
 ## ISO originale
 
-ISO `murus-igneus-0.3.0-alpha.5-devuan-amd64.iso`, SHA-256 `d67e09e1917b8c489ed9537de62f94df4f49be331760ce9dce33400c302cdbb9`.
+ISO `murus-igneus-0.3.0-alpha.5-devuan-amd64.iso`, SHA-256 `7bbceee7a1bdde8e47b909c46c22e2effa1c9c5f1836dcf6f33239c8c659fc81`.
 
-23 verifiche superate: avvio UEFI, backend HTTPS reale, le 11 prove native e le 9 prove IKEv2/WAN eseguite dai moduli installati nella ISO in namespace isolati, quindi spegnimento regolare. QEMU TCG, 2 CPU, 2048 MiB RAM e tre NIC Virtio; nessun disco di installazione, BIOS o Secure Boot.
+24 verifiche superate: avvio UEFI, backend HTTPS reale, applicazione IPsec al backend effettivo dell’appliance con avvio del daemon Murus e suo arresto tramite rollback, le 11 prove native e le 9 prove IKEv2/WAN eseguite dai moduli installati nella ISO in namespace isolati, quindi spegnimento regolare. QEMU TCG, 2 CPU, 2048 MiB RAM e tre NIC Virtio; nessun disco di installazione, BIOS o Secure Boot. Il servizio di distribuzione ipsec è disabilitato nella ISO per evitare conflitti con il daemon gestito da Murus.
 
 Firme ufficiali ClamAV scaricate correttamente durante questa build. Manifest dei pacchetti allegato alla release.
 
