@@ -202,7 +202,7 @@ class Handler(BaseHTTPRequestHandler):
         if getattr(self,'mfa_cookie',None):self.send_header('Set-Cookie','murus_mfa='+self.mfa_cookie+'; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=900')
         self.end_headers();self.wfile.write(b)
         if self.command=='POST':
-            try:eventlog.append(STATE,'audit',{'path':self.path,'status':status,'peer':self.client_address[0]})
+            try:eventlog.append(STATE,'audit',{'path':self.path[:200],'status':status,'peer':self.client_address[0]})
             except Exception:pass
     def do_GET(self):
         if not self.auth():return

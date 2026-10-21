@@ -78,6 +78,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install actual IKEv2 and network test tools
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nftables iproute2 iputils-ping strongswan-charon strongswan-swanctl libcharon-extra-plugins libstrongswan-standard-plugins
+      - name: Allow only the disposable lab paths in existing AppArmor profiles
+        run: |
+          for profile in usr.lib.ipsec.charon usr.sbin.swanctl; do
+            if [ -f "/etc/apparmor.d/$profile" ]; then
+              echo '/tmp/murus-enterprise-*/** rw,' | sudo tee -a "/etc/apparmor.d/local/$profile"
+              sudo apparmor_parser -r "/etc/apparmor.d/$profile"
+            fi
+          done
       - name: Exercise IKEv2 and WAN failover using real packets
         run: |
           sudo env MURUS_LAB=YES unshare --mount --net --fork python3 tools/validate-enterprise-runtime.py || { sudo dmesg | tail -80; exit 1; }

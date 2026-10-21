@@ -29,10 +29,15 @@ def prune(db):
     db.execute('DELETE FROM events WHERE id < COALESCE((SELECT id FROM events ORDER BY id DESC LIMIT 1 OFFSET 19999),0)')
 
 
+def encode(detail):
+    value = json.dumps(detail, ensure_ascii=False)
+    return value if len(value) <= 6000 else json.dumps({'truncated': True, 'summary': value[:5500]}, ensure_ascii=False)
+
+
 def append(state, kind, detail, fingerprint=None):
     with closing(connect(state)) as db, db:
         db.execute('INSERT OR IGNORE INTO events(time,kind,detail,fingerprint) VALUES (?,?,?,?)',
-                   (time.time(), kind, json.dumps(detail, ensure_ascii=False)[:6000], fingerprint))
+                   (time.time(), kind, encode(detail), fingerprint))
         prune(db)
 
 
@@ -50,7 +55,7 @@ def collect(state):
         for row in traffic.events(raw):
             fingerprint = hashlib.sha256((boot + row['raw']).encode()).hexdigest()
             db.execute('INSERT OR IGNORE INTO events(time,kind,detail,fingerprint) VALUES (?,?,?,?)',
-                       (time.time(), 'packet', json.dumps(row, ensure_ascii=False)[:6000], fingerprint))
+                       (time.time(), 'packet', encode(row), fingerprint))
         prune(db)
 
 

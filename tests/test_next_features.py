@@ -103,6 +103,9 @@ class NewFeatures(unittest.TestCase):
         history = eventlog.history(self.state)['events']
         self.assertEqual(len(history),2);self.assertEqual(history[0]['kind'],'audit')
         self.assertEqual((self.state/'logs/events.sqlite').stat().st_mode & 0o777,0o600)
+    def test_oversized_audit_detail_remains_valid_json(self):
+        eventlog.append(self.state, 'audit', {'path':'x'*10000})
+        self.assertTrue(eventlog.history(self.state)['events'][0]['detail']['truncated'])
     def test_ipsec_rules_are_bound_to_interfaces_and_xfrm(self):
         plan = configuration.compile_config(draft())
         self.assertTrue(plan['ready'])
