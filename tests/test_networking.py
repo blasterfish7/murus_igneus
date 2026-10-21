@@ -97,9 +97,16 @@ class NativeNetworkTests(unittest.TestCase):
         self.assertIn('option:dns-server,203.0.113.53', text)
         self.assertNotIn('server=', text)
 
+    def test_dns_and_dhcp_can_be_disabled_together(self):
+        c = base(); c['dns']['enabled'] = False; c['dhcp'][0]['enabled'] = False
+        plan = compile_config(c)
+        self.assertTrue(plan['ready'])
+        self.assertEqual(networking.dnsmasq_config(plan['network_services'], 'eth0'), '')
+
     def test_dnsmasq_no_host_configuration_or_management_binding(self):
         text = networking.dnsmasq_config(compile_config(base())['network_services'], 'eth0')
         self.assertIn('no-resolv\nno-hosts', text)
+        self.assertIn('local=/lab.lan/', text)
         self.assertIn('except-interface=eth0', text)
         self.assertIn('interface=eth2.20', text)
         self.assertNotIn('\ninterface=eth0', text)

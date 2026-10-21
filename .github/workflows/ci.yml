@@ -34,6 +34,17 @@ jobs:
           node --check src/murus_igneus/network.js
           node tests/test_management_ui.js
           node tests/test_network_ui.js
+      - name: Real Chromium native configuration GUI
+        run: |
+          npm install --prefix "$RUNNER_TEMP/murus-browser" playwright-core@1.64.1 @sparticuz/chromium@153.0.0
+          node tools/prepare-browser.cjs "$RUNNER_TEMP/murus-browser"
+          MURUS_PLAYWRIGHT="$RUNNER_TEMP/murus-browser/node_modules/playwright-core" MURUS_CHROMIUM="$RUNNER_TEMP/murus-browser/bin/chromium" node tools/validate-networking-browser.cjs
+      - name: Save browser acceptance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: murus-native-browser-qa
+          path: dist/browser-networking-qa.json
+          retention-days: 14
       - name: Build Devuan package
         run: sh packaging/devuan/build-deb.sh
       - name: Upload Devuan package

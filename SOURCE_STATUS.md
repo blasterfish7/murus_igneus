@@ -6,7 +6,7 @@ the existing apply/confirm/rollback transaction and are preserved by installatio
 Only independent application code and open-source system components are used.
 See [native networking](docs/NATIVE-NETWORKING.md) for ordering, limits and tests.
 
-Local regression suite: 121 tests; three protocol tests require Net-SNMP tools
+Local regression suite: 123 tests; three protocol tests require Net-SNMP tools
 that are absent locally. CI executes those tools and a new real-packet namespace
 acceptance job before producing the alpha.4 ISO. No alpha.4 ISO boot/install or
 physical-hardware acceptance has yet been recorded. The following alpha.3 record

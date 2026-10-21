@@ -26,7 +26,8 @@ server addresses, or leave them empty when local DNS is enabled on that interfac
 Do not enable a pool on a segment that already has an authoritative DHCP server.
 Reservations, relay, DHCPv6 and delegated prefixes are not implemented.
 
-DNS provides caching/forwarding and DHCP lease names with a local domain. Select
+DNS provides caching/forwarding and DHCP lease names with a local domain.
+Unresolved names within that domain are kept local rather than forwarded upstream. Select
 the data interfaces and up to eight explicit upstream IPv4 resolvers. There is no
 automatic `/etc/resolv.conf` fallback or `/etc/hosts` import. No DNSSEC or DNS
 category filtering is claimed. Forwarding to the firewall itself is rejected.
@@ -83,3 +84,13 @@ alpha.3 ISO results remain specific to alpha.3.
 
 Protocol references: [dnsmasq manual](https://thekelleys.org.uk/dnsmasq/docs/dnsmasq-man.html)
 and [nftables manual](https://netfilter.org/projects/nftables/manpage.html).
+
+The real Chromium GUI harness is `tools/validate-networking-browser.cjs`, with
+a loopback HTTP fixture that disables system commands and application. It creates
+physical/VLAN interfaces, DHCP/DNS and a publication through the forms and passes
+the resulting draft to the real backend compiler. Runtime health/traffic responses
+in that harness are controlled fixtures; actual packet acceptance is separate.
+The ISO job also boots the exact generated image with OVMF UEFI in QEMU TCG and
+executes the packet suite using the modules actually installed in that image.
+It verifies the real HTTPS backend and graceful poweroff; it does not test disk
+installation or physical hardware. Its JSON report includes the ISO SHA-256.

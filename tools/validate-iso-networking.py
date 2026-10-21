@@ -1,6 +1,7 @@
 """UEFI ISO boot and native-network acceptance in disposable QEMU. SPDX-License-Identifier: MIT."""
 import base64
 import gzip
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -37,7 +38,7 @@ with tempfile.TemporaryDirectory(prefix='murus-iso-qa-') as work:
 
         def command(text, timeout=180):
             child.sendline(text + "; printf '\\n__MIQA_END__:%s\\n' \"$?\"")
-            child.expect(r'\r?\n__MIQA_END__:(\d+)\r?\n', timeout=timeout)
+            child.expect(r'\r*\n__MIQA_END__:(\d+)\r*\n', timeout=timeout)
             output = child.before; status = int(child.match.group(1)); child.expect(prompt)
             if status:
                 raise RuntimeError('Guest command failed: ' + output[-5000:])
@@ -78,7 +79,9 @@ print('ISO_HTTPS_ALPHA4_NATIVE_VLAN_PREVIEW_OK')
         print('PASS real packet suite on original ISO: ' + str(len(runtime['checks'])) + ' checks', flush=True)
         child.sendline('poweroff'); child.expect(pexpect.EOF, timeout=300)
         checks.append('Graceful live VM poweroff'); print('PASS ' + checks[-1], flush=True)
-        result = {'success': True, 'checks': checks, 'iso': iso.name, 'scope': 'QEMU TCG UEFI live boot; installed product modules exercised with real packets inside isolated guest namespaces. No disk installation, Secure Boot or physical hardware test.'}
+        with iso.open('rb') as file:
+            digest = hashlib.file_digest(file, 'sha256').hexdigest()
+        result = {'success': True, 'checks': checks, 'iso': iso.name, 'sha256': digest, 'scope': 'QEMU TCG UEFI live boot; installed product modules exercised with real packets inside isolated guest namespaces. No disk installation, Secure Boot or physical hardware test.'}
         (ROOT / 'dist/alpha4-iso-networking-qa.json').write_text(json.dumps(result, indent=2) + '\n')
     finally:
         if child.isalive():

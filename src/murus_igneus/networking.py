@@ -135,7 +135,7 @@ def prepare(config, management):
         if not isinstance(servers, list) or len(servers) > 4:
             raise Error('DNS del pool DHCP non validi')
         row['dns_servers'] = list(dict.fromkeys(host(s) for s in servers))
-        if not servers and not (dns['enabled'] and name in dns['interfaces']):
+        if enabled(row) and not servers and not (dns['enabled'] and name in dns['interfaces']):
             raise Error('DHCP: indicare resolver oppure abilitare DNS sulla stessa interfaccia')
     ids = set(); bindings = set()
     for row in rows('port_forwards'):
@@ -220,7 +220,7 @@ def dnsmasq_config(settings, management):
     lines = ['bind-interfaces', 'except-interface=lo', 'except-interface=' + management,
              'no-resolv', 'no-hosts', 'domain-needed', 'bogus-priv', 'no-poll',
              'dhcp-lease-max=4096', 'dhcp-leasefile=/var/lib/murus-igneus/dnsmasq.leases',
-             'user=root', 'group=root', 'log-facility=-', 'domain=' + dns['domain']]
+             'user=root', 'group=root', 'log-facility=-', 'domain=' + dns['domain'], 'local=/' + dns['domain'] + '/']
     if not dns['enabled']:
         lines.append('port=0')
     for name in sorted(names):
