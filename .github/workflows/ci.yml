@@ -71,6 +71,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build signed-main Devuan appliance ISO
         run: bash tools/build-devuan-iso.sh
+      - name: Install disposable UEFI test tools
+        run: apt-get install -y --no-install-recommends qemu-system-x86 ovmf python3-pexpect
+      - name: Boot original ISO and run real network acceptance in guest
+        run: MURUS_LAB=YES python3 tools/validate-iso-networking.py
       - name: Save ISO, checksums and package manifest
         uses: actions/upload-artifact@v4
         with:
@@ -81,6 +85,7 @@ jobs:
             dist/packages-devuan.tsv
             dist/signature-status.txt
             dist/clamav-build.log
+            dist/alpha4-iso-networking-qa.json
           compression-level: 0
           retention-days: 14
 

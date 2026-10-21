@@ -121,6 +121,16 @@ class NativeNetworkTests(unittest.TestCase):
 
 
 class NetworkRuntimeTests(unittest.TestCase):
+    def test_existing_owned_vlan_can_be_reapplied_with_named_parent(self):
+        op = {'kind': 'vlan', 'interface': 'eth2.20', 'parent': 'eth2', 'vlan_id': 20}
+        links = [{'ifname': 'eth2', 'ifindex': 3, 'flags': ['UP']}, {'ifname': 'eth2.20', 'ifindex': 4, 'link': 'eth2', 'ifalias': networking.VLAN_ALIAS, 'linkinfo': {'info_kind': 'vlan', 'info_data': {'id': 20}}}]
+        def run(args, *a, **kw):
+            if args == ['ip', '-j', '-d', 'link']: return json.dumps(links)
+            if args == ['ip', '-j', '-4', 'addr', 'show', 'dev', 'eth0']: return '[]'
+            if args == ['ip', '-j', 'link', 'show', 'dev', 'eth2']: return json.dumps([links[0]])
+            raise AssertionError('Unexpected mutation: ' + str(args))
+        with patch.object(server, 'run', run): server.network([op], [])
+
     def test_foreign_vlan_collision_fails_before_mutation(self):
         ops = [{'kind': 'vlan', 'interface': 'eth2.20', 'parent': 'eth2', 'vlan_id': 20}]
         links = [{'ifname': 'eth2', 'ifindex': 3}, {'ifname': 'eth2.20', 'ifindex': 4, 'link_index': 3, 'linkinfo': {'info_kind': 'vlan', 'info_data': {'id': 20}}}]

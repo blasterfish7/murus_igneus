@@ -46,6 +46,8 @@ def device(value, management):
 
 
 def host(value):
+    if not isinstance(value, str):
+        raise Error('IPv4 richiesto come stringa')
     a = ip.IPv4Address(value)
     if a.is_unspecified or a.is_multicast or a.is_loopback or a.is_link_local or int(a) == 0xffffffff:
         raise Error('Indirizzo IPv4 host non valido')

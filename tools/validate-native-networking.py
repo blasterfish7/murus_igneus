@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'src/murus_igneus'))
@@ -147,6 +148,15 @@ print(json.dumps({'address':socket.inet_ntoa(ack[16:20]),'gateway':socket.inet_n
         ident = apply(disabled, confirm=False); assert 'error' in http()
         with server.LOCK: server.rollback(ident)
         assert http().get('status') == 200; ok('DNAT removal closes service; rollback restores publication')
+        apply(disabled, confirm=False)
+        assert 'error' in http()
+        print('Waiting for the real 90-second confirmation timeout...', flush=True)
+        deadline = time.monotonic() + 110
+        while server.PENDING and time.monotonic() < deadline:
+            time.sleep(.5)
+        assert server.PENDING is None, 'Automatic rollback timer did not complete'
+        assert http().get('status') == 200
+        dns('milan', '198.51.100.1'); ok('Unconfirmed publication removal rolls back automatically after 90 seconds, including DNS')
         saved = json.loads((server.STATE / 'active.json').read_text()); assert saved['configuration']['dns'] == config['dns']
         assert saved['configuration']['interfaces'][2]['vlan_id'] == 20; ok('Confirmed native settings persisted in active.json')
         result = {'success': True, 'checks': checks, 'scope': 'Isolated Linux namespace with real nftables, veth VLAN, dnsmasq, DHCP packets, DNS and TCP traffic; not ISO/hardware acceptance.'}

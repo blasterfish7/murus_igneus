@@ -61,7 +61,8 @@ def network(ops,undo):
             old=available.get(dev)
             if old:
                 info=old.get('linkinfo',{});parent=available[op['parent']]
-                if old.get('ifalias')!=networking.VLAN_ALIAS or info.get('info_kind')!='vlan' or info.get('info_data',{}).get('id')!=op['vlan_id'] or old.get('link_index')!=parent['ifindex']:raise Error('Nome VLAN già occupato o VLAN non gestita da Murus')
+                same_parent=old.get('link')==op['parent'] or old.get('link_index')==parent['ifindex']
+                if old.get('ifalias')!=networking.VLAN_ALIAS or info.get('info_kind')!='vlan' or info.get('info_data',{}).get('id')!=op['vlan_id'] or not same_parent:raise Error('Nome VLAN già occupato o VLAN non gestita da Murus')
         if op['kind']=='route' and any(ipaddress.IPv4Network(op['destination']).subnet_of(n) for n in reserved):raise Error('La rotta ricade nella rete di gestione')
         if op['kind']=='address' and any(ipaddress.IPv4Interface(op['address']).network.overlaps(n) for n in reserved):raise Error('La rete importata si sovrappone alla rete di gestione')
     for op in ops:
