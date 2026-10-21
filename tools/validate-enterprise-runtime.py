@@ -39,7 +39,7 @@ if '--agent' in sys.argv:
         except Exception as exc:
             if (enterprise.RUN/'charon.log').exists():
                 print((enterprise.RUN/'charon.log').read_text()[-6000:],file=sys.stderr,flush=True)
-            print(json.dumps({'ok':False,'error':str(exc)}),flush=True)
+            print(json.dumps({'ok':False,'error':str(exc),'diagnostic':(enterprise.RUN/'charon.log').read_text()[-6000:] if (enterprise.RUN/'charon.log').exists() else ''}),flush=True)
     enterprise.stop()
     raise SystemExit()
 

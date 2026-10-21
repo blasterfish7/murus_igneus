@@ -31,7 +31,7 @@ Section: net
 Priority: optional
 Architecture: all
 Maintainer: Murus Igneus contributors
-Depends: python3 (>= 3.11), nftables, iproute2, openssl, conntrack, kmod, wireguard-tools, strongswan-charon, strongswan-swanctl, libcharon-extra-plugins, iputils-ping, dpkg-repack, ca-certificates, suricata, suricata-update, clamav, clamav-daemon, clamav-freshclam, python3-yaml, snmp, dnsmasq-base, rsync, fdisk, parted, dosfstools, e2fsprogs, grub-pc-bin, grub-efi-amd64-bin, grub2-common, openrc, init-system-helpers
+Depends: python3 (>= 3.11), nftables, iproute2, openssl, conntrack, kmod, wireguard-tools, strongswan-charon, strongswan-swanctl, libcharon-extra-plugins, libstrongswan-standard-plugins, iputils-ping, dpkg-repack, ca-certificates, suricata, suricata-update, clamav, clamav-daemon, clamav-freshclam, python3-yaml, snmp, dnsmasq-base, rsync, fdisk, parted, dosfstools, e2fsprogs, grub-pc-bin, grub-efi-amd64-bin, grub2-common, openrc, init-system-helpers
 Description: Experimental IPv4 firewall management for Devuan 6 Excalibur
  Independent configuration editor and conservative configuration importer.
  Includes an OpenRC service. Includes VPN, IPS, HTTP antivirus, local AI connector and SNMP switch management.

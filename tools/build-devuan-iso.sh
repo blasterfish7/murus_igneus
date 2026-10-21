@@ -37,7 +37,7 @@ for name in dev proc sys; do
     mount --make-rslave "$root/$name"
 done
 chroot "$root" apt-get update
-chroot "$root" apt-get install -y --no-install-recommends linux-image-amd64 live-boot initramfs-tools sysvinit-core openrc ifupdown isc-dhcp-client kmod python3 python3-yaml snmp dnsmasq-base nftables iproute2 openssl conntrack wireguard-tools strongswan-charon strongswan-swanctl libcharon-extra-plugins iputils-ping dpkg-repack suricata suricata-update clamav clamav-daemon clamav-freshclam rsync fdisk parted dosfstools e2fsprogs grub-pc-bin grub-efi-amd64-bin grub2-common ca-certificates curl
+chroot "$root" apt-get install -y --no-install-recommends linux-image-amd64 live-boot initramfs-tools sysvinit-core openrc ifupdown isc-dhcp-client kmod python3 python3-yaml snmp dnsmasq-base nftables iproute2 openssl conntrack wireguard-tools strongswan-charon strongswan-swanctl libcharon-extra-plugins libstrongswan-standard-plugins iputils-ping dpkg-repack suricata suricata-update clamav clamav-daemon clamav-freshclam rsync fdisk parted dosfstools e2fsprogs grub-pc-bin grub-efi-amd64-bin grub2-common ca-certificates curl
 bash "$project/packaging/devuan/build-deb.sh" "$out"
 cp "$out/murus-igneus_0.3.0~alpha.5_all.deb" "$root/tmp/murus.deb"
 chroot "$root" dpkg -i /tmp/murus.deb

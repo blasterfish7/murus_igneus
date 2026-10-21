@@ -77,7 +77,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install actual IKEv2 and network test tools
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nftables iproute2 iputils-ping strongswan-charon strongswan-swanctl libcharon-extra-plugins
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nftables iproute2 iputils-ping strongswan-charon strongswan-swanctl libcharon-extra-plugins libstrongswan-standard-plugins
       - name: Exercise IKEv2 and WAN failover using real packets
         run: sudo env MURUS_LAB=YES unshare --mount --net --fork python3 tools/validate-enterprise-runtime.py
       - name: Save enterprise acceptance report
