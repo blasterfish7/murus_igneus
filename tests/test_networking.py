@@ -128,6 +128,15 @@ class NativeNetworkTests(unittest.TestCase):
 
 
 class NetworkRuntimeTests(unittest.TestCase):
+    def test_existing_vlan_cannot_be_disguised_as_physical_parent(self):
+        links = [{'ifname': 'eth2', 'ifindex': 3, 'linkinfo': {'info_kind': 'vlan', 'info_data': {'id': 10}}}]
+        def run(args, *a, **kw):
+            if args == ['ip', '-j', '-d', 'link']: return json.dumps(links)
+            if args == ['ip', '-j', '-4', 'addr', 'show', 'dev', 'eth0']: return '[]'
+            raise AssertionError('Unexpected mutation: ' + str(args))
+        with patch.object(server, 'run', run), self.assertRaisesRegex(ValueError, 'fisica'):
+            server.network([{'kind': 'vlan', 'interface': 'vlan20', 'parent': 'eth2', 'vlan_id': 20}], [])
+
     def test_existing_owned_vlan_can_be_reapplied_with_named_parent(self):
         op = {'kind': 'vlan', 'interface': 'eth2.20', 'parent': 'eth2', 'vlan_id': 20}
         links = [{'ifname': 'eth2', 'ifindex': 3, 'flags': ['UP']}, {'ifname': 'eth2.20', 'ifindex': 4, 'link': 'eth2', 'ifalias': networking.VLAN_ALIAS, 'linkinfo': {'info_kind': 'vlan', 'info_data': {'id': 20}}}]

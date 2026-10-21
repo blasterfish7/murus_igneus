@@ -58,6 +58,7 @@ def network(ops,undo):
         if dev in ('lo',MGMT) or (dev not in available and dev not in vlans):raise Error('Scheda dati assente o riservata')
         if op['kind']=='vlan':
             if op['parent'] not in available or op['parent'] in ('lo',MGMT):raise Error('Porta padre VLAN assente o riservata')
+            if available[op['parent']].get('linkinfo',{}).get('info_kind') not in (None,'veth'):raise Error('Il padre VLAN deve essere una porta fisica dati')
             old=available.get(dev)
             if old:
                 info=old.get('linkinfo',{});parent=available[op['parent']]
