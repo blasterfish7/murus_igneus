@@ -1,3 +1,17 @@
+# Native networking — 0.3.0-alpha.4 (work in validation)
+
+Adds VLAN interfaces, DHCP pools, local DNS forwarding, explicit TCP/UDP port
+forwarding and a bounded read-only connection/event view. Native settings share
+the existing apply/confirm/rollback transaction and are preserved by installation.
+Only independent application code and open-source system components are used.
+See [native networking](docs/NATIVE-NETWORKING.md) for ordering, limits and tests.
+
+Local regression suite: 121 tests; three protocol tests require Net-SNMP tools
+that are absent locally. CI executes those tools and a new real-packet namespace
+acceptance job before producing the alpha.4 ISO. No alpha.4 ISO boot/install or
+physical-hardware acceptance has yet been recorded. The following alpha.3 record
+is historical and must not be interpreted as an alpha.4 test result.
+
 # ISO alpha.3 acceptance — 2026-10-21
 
 The original ISO from source `f7517ea456a751c0e0e7e08675d56c5de5903349`

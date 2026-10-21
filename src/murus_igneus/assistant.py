@@ -153,15 +153,15 @@ def ask(state, data, management, switch_summary=None, logs=''):
             if allow_proposal:
                 payload['messages'][0]['content'] += ('\nRispondi con un oggetto JSON: campo answer con spiegazione '
                     'e campo configuration con la configurazione nativa completa proposta, oppure null. '
-                    'Conserva i campi VPN/UTM e gli elementi non interessati dalla modifica. '
+                    'Conserva i campi VLAN/DHCP/DNS/DNAT e VPN/UTM e gli elementi non interessati dalla modifica. '
                     'La proposta sarà solo una bozza da verificare, non sarà applicata. '
-                    'Schema nativo: schema=1; interfaces usa name,device,address; '
+                    'Schema nativo: schema=1; interfaces usa name,device,address, e facoltativamente parent,vlan_id per VLAN; '
                     'addresses usa ESATTAMENTE name,subnet (subnet è un CIDR IPv4: non usare ip,cidr,address o type); '
                     'groups e service_groups usano name,members; services usa name,tcp,udp (porte come stringhe); '
                     'policies usa id (stringa numerica),name,srcintf,dstintf,srcaddr,dstaddr,service '
                     '(selezioni come array),action (accept/deny),nat,log,enabled (booleani); '
                     'routes usa id,destination,gateway,interface,distance,priority,enabled. '
-                    'Non aggiungere chiavi non previste. Per VPN e UTM conserva gli oggetti forniti nel contesto.')
+                    'Non aggiungere chiavi non previste. Per DHCP, DNS, port_forwards, VPN e UTM conserva gli oggetti forniti nel contesto.')
             result = request(settings, '/api/chat', payload, timeout=240 if allow_proposal else 120)
             try:
                 content = result['message']['content']
@@ -189,7 +189,7 @@ def ask(state, data, management, switch_summary=None, logs=''):
                     # a model must return the complete draft it claims to edit.
                     if not isinstance(proposal, dict) or set(plan['configuration']) - set(proposal):
                         raise ValueError('Configurazione incompleta: includere tutte le sezioni della bozza, VPN e UTM comprese')
-                    for section in ('vpn', 'utm'):
+                    for section in ('vpn', 'utm', 'dns'):
                         if not isinstance(proposal[section], dict) or set(plan['configuration'][section]) - set(proposal[section]):
                             raise ValueError('Sezione incompleta: ' + section)
                     candidate = compile_config(proposal, management)

@@ -138,12 +138,13 @@ _compile_base=compile_config
 def compile_config(config,management='eth0'):
     import copy
     try:
-        from . import security
+        from . import security, networking
     except ImportError:
-        import security
+        import security, networking
     if not isinstance(config,dict):raise Error('Configurazione non valida')
     settings=security.validate(config,management)
-    original=copy.deepcopy(config);base={k:v for k,v in original.items() if k not in ('vpn','utm')}
+    original=copy.deepcopy(config);prepared,interfaces,services,vlans=networking.prepare(original,management)
+    base={k:v for k,v in prepared.items() if k not in ('vpn','utm')}
     for row in base.get('interfaces',[]):
         if row.get('name')=='VPN' or row.get('device')==security.WG:raise Error('VPN/mivpn0 sono riservati al tunnel')
     devices={r.get('device') for r in base.get('interfaces',[])}
@@ -157,10 +158,14 @@ def compile_config(config,management='eth0'):
     if settings['utm']['proxy']:
         port=next((r for r in base.get('interfaces',[]) if r.get('device')==settings['utm']['proxy_device']),None)
         if not port or not port.get('address'):raise Error('Il proxy richiede una porta dati con IPv4 statico')
+    if settings['vpn']['enabled']:
+        devices_by_name={r['name']:r['device'] for r in interfaces}
+        if any(r.get('enabled',True) and r['protocol']=='udp' and r['external_port']==settings['vpn']['port'] and devices_by_name[r['interface']]==settings['vpn']['public_device'] for r in services['port_forwards']):raise Error('La porta DNAT è riservata alla VPN WireGuard')
     plan=_compile_base(base,management)
     if settings['vpn']['enabled']:plan['configuration']['interfaces']=[r for r in plan['configuration']['interfaces'] if r['name']!='VPN']
     plan['configuration'].update(settings);plan['security']=settings
     plan['nftables']=security.decorate(plan['nftables'],settings)
+    networking.decorate(plan,interfaces,services,vlans)
     plan['version']=VERSION
     return plan
 

@@ -58,7 +58,7 @@ def install(disk,log):
         mount(['-o','loop,ro','/run/live/medium/live/filesystem.squashfs'],source)
         mount([part(3)],target)
         run(['rsync','-aHAX','--numeric-ids',str(source)+'/',str(target)+'/'])
-        for name in ('/etc/murus_igneus','/var/lib/clamav','/var/lib/suricata','/var/lib/murus_igneus'):
+        for name in ('/etc/murus_igneus','/var/lib/clamav','/var/lib/suricata','/var/lib/murus_igneus','/var/lib/murus-igneus'):
             if Path(name).exists():
                 dest=target/name.lstrip('/');dest.mkdir(parents=True,exist_ok=True)
                 run(['rsync','-aHAX','--numeric-ids',name+'/',str(dest)+'/'])

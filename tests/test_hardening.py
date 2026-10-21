@@ -39,7 +39,7 @@ class ManagementRouteTests(unittest.TestCase):
             self.calls.append(args)
             if args[:4] == ['ip', '-j', 'link', 'show']:
                 return json.dumps([{'flags': ['UP']}])
-            if args[:3] == ['ip', '-j', 'link']:
+            if args[:3] == ['ip', '-j', 'link'] or args == ['ip', '-j', '-d', 'link']:
                 return json.dumps([{'ifname': 'eth0'}, {'ifname': 'eth1'}])
             if args[:4] == ['ip', '-j', '-4', 'addr'] and args[-1] == server.MGMT:
                 return json.dumps([{'addr_info': [{'local': '10.0.0.5', 'prefixlen': 24}]}])

@@ -18,11 +18,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 try:
     from .migration import VERSION, baseline, Error
     from .configuration import compile_config, from_backup, empty
-    from . import security, installer, jobs, assistant, switches
+    from . import security, installer, jobs, assistant, switches, networking, traffic
 except ImportError:
     from migration import VERSION, baseline, Error
     from configuration import compile_config, from_backup, empty
-    import security, installer, jobs, assistant, switches
+    import security, installer, jobs, assistant, switches, networking, traffic
 
 STATE=Path('/etc/murus_igneus');MGMT=os.environ.get('MURUS_MANAGEMENT_INTERFACE','eth0');LOCK=threading.RLock()
 if not re.fullmatch(r'[A-Za-z0-9_.-]{1,15}',MGMT) or MGMT=='lo':raise ValueError('Interfaccia di gestione non valida')
@@ -45,17 +45,36 @@ def check_vpn_management(settings):
     routes=[ipaddress.IPv4Interface(v['address']).network]+[ipaddress.IPv4Network(n) for p in v['peers'] for n in p['allowed_ips']]
     if any(n.overlaps(m) for n in routes for m in protected):raise Error('Una rete VPN si sovrappone alla rete di gestione')
 
+def vlan_add(op):
+    return ['ip','link','add','link',op['parent'],'name',op['interface'],'type','vlan','id',str(op['vlan_id'])]
+
 def network(ops,undo):
-    available={x['ifname'] for x in json.loads(run(['ip','-j','link']))}
+    links=json.loads(run(['ip','-j','-d','link']));available={x['ifname']:x for x in links}
     mgmt=json.loads(run(['ip','-j','-4','addr','show','dev',MGMT]))
     reserved=[ipaddress.IPv4Interface(a['local']+'/'+str(a['prefixlen'])).network for i in mgmt for a in i.get('addr_info',[])]
+    vlans={o['interface']:o for o in ops if o['kind']=='vlan'}
     for op in ops:
         dev=op['interface']
-        if dev not in available or dev in ('lo',MGMT):raise Error('Scheda dati assente o riservata')
+        if dev in ('lo',MGMT) or (dev not in available and dev not in vlans):raise Error('Scheda dati assente o riservata')
+        if op['kind']=='vlan':
+            if op['parent'] not in available or op['parent'] in ('lo',MGMT):raise Error('Porta padre VLAN assente o riservata')
+            old=available.get(dev)
+            if old:
+                info=old.get('linkinfo',{});parent=available[op['parent']]
+                if old.get('ifalias')!=networking.VLAN_ALIAS or info.get('info_kind')!='vlan' or info.get('info_data',{}).get('id')!=op['vlan_id'] or old.get('link_index')!=parent['ifindex']:raise Error('Nome VLAN già occupato o VLAN non gestita da Murus')
         if op['kind']=='route' and any(ipaddress.IPv4Network(op['destination']).subnet_of(n) for n in reserved):raise Error('La rotta ricade nella rete di gestione')
         if op['kind']=='address' and any(ipaddress.IPv4Interface(op['address']).network.overlaps(n) for n in reserved):raise Error('La rete importata si sovrappone alla rete di gestione')
     for op in ops:
-        dev=op['interface'];info=json.loads(run(['ip','-j','link','show','dev',dev]))[0]
+        dev=op['interface']
+        if op['kind']=='vlan':
+            parent=json.loads(run(['ip','-j','link','show','dev',op['parent']]))[0]
+            if 'UP' not in parent['flags']:
+                run(['ip','link','set','dev',op['parent'],'up']);undo.append(['ip','link','set','dev',op['parent'],'down'])
+            if dev not in available:
+                run(vlan_add(op));undo.append(['ip','link','del','dev',dev])
+                run(['ip','link','set','dev',dev,'alias',networking.VLAN_ALIAS])
+            continue
+        info=json.loads(run(['ip','-j','link','show','dev',dev]))[0]
         if 'UP' not in info['flags']:
             run(['ip','link','set','dev',dev,'up']);undo.append(['ip','link','set','dev',dev,'down'])
         if op['kind']=='address':
@@ -69,11 +88,18 @@ def network(ops,undo):
             run(['ip','route','add']+args);undo.append(['ip','route','del']+args)
 
 def remove_previous(previous,current,undo):
-    """Remove only resources owned by the last confirmed configuration."""
-    obsolete=[o for o in previous if o not in current and o['kind']!='link']
-    for op in sorted(obsolete,key=lambda o:0 if o['kind']=='route' else 1):
+    """Remove owned addresses/routes before obsolete VLANs; restore in reverse."""
+    replaced={o['interface'] for o in previous if o['kind']=='vlan' and o not in current}
+    obsolete=[o for o in previous if o['kind']!='link' and (o not in current or o['interface'] in replaced)]
+    for op in sorted(obsolete,key=lambda o:{'route':0,'address':1,'vlan':2}[o['kind']]):
         dev=op['interface']
         if dev in (MGMT,'lo'):raise Error('Risorsa di gestione riservata')
+        if op['kind']=='vlan':
+            info=json.loads(run(['ip','-j','-d','link','show','dev',dev]))[0]
+            if info.get('ifalias')!=networking.VLAN_ALIAS or info.get('linkinfo',{}).get('info_data',{}).get('id')!=op['vlan_id']:raise Error('VLAN modificata fuori da Murus: rimozione bloccata')
+            run(['ip','link','del','dev',dev])
+            undo.extend([['ip','link','set','dev',dev,'up'],['ip','link','set','dev',dev,'alias',networking.VLAN_ALIAS],vlan_add(op)])
+            continue
         if op['kind']=='route':
             existing=json.loads(run(['ip','-j','-4','route','show','exact',op['destination']]))
             if not any(r.get('gateway')==op['gateway'] and r.get('dev')==dev and r.get('metric')==op['metric'] for r in existing):continue
@@ -84,15 +110,21 @@ def remove_previous(previous,current,undo):
             args=['ip','addr','del',op['address'],'dev',dev]
         run(args);restore=args.copy();restore[2]='add';undo.append(restore)
 
+def service_settings(plan):
+    return plan.get('network_services',{'interfaces':[],**networking.defaults()}) if plan else {'interfaces':[],**networking.defaults()}
+
 def rollback(ident):
     global PENDING,LAST
     with LOCK:
         if not PENDING or PENDING['id']!=ident:return
         p=PENDING
         run(['nft','-f','-'],baseline(MGMT))
+        networking.stop()
         for args in reversed(p['undo']):run(args,check=False)
         service_error=None
-        try:security.activate(p['security'])
+        try:
+            security.activate(p['security'])
+            networking.activate(service_settings(ACTIVE),MGMT)
         except Exception as e:service_error=str(e)
         run(['nft','-f','-'],p['old']);run(['conntrack','-F'],check=False)
         run(['sysctl','-w','net.ipv4.ip_forward='+p['forward']],check=False)
@@ -109,11 +141,14 @@ def apply(plan):
     PENDING={'id':ident,'deadline':time.time()+90,'undo':[],'old':'add table inet murus_igneus\nflush table inet murus_igneus\n'+old,'forward':Path('/proc/sys/net/ipv4/ip_forward').read_text().strip(),'plan':plan,'security':ACTIVE.get('security',security.defaults()) if ACTIVE else security.defaults()}
     try:
         run(['nft','-f','-'],baseline(MGMT))
+        networking.stop()
         remove_previous(ACTIVE['network_ops'] if ACTIVE else [],plan['network_ops'],PENDING['undo'])
         settings=plan.get('security',security.defaults())
         check_vpn_management(settings)
         security.activate(settings)
-        network(plan['network_ops'],PENDING['undo']);run(['nft','-f','-'],plan['nftables'])
+        network(plan['network_ops'],PENDING['undo'])
+        networking.activate(service_settings(plan),MGMT)
+        run(['nft','-f','-'],plan['nftables'])
         run(['conntrack','-F']);run(['sysctl','-w','net.ipv4.ip_forward=1'])
     except Exception:
         rollback(ident);raise
@@ -149,16 +184,18 @@ class Handler(BaseHTTPRequestHandler):
                 if self.path=='/api/status':
                     links=json.loads(run(['ip','-j','link']))
                     self.reply(200,{'version':VERSION,'csrf':CSRF,'management':MGMT,'links':[x['ifname'] for x in links if x['ifname'] not in (MGMT,'lo')],'last':LAST,'maintenance':jobs.busy(),'pending':{'id':PENDING['id'],'deadline':PENDING['deadline'],'remaining':max(0,PENDING['deadline']-time.time())} if PENDING else None})
-                elif self.path=='/api/configuration':self.reply(200,{'configuration':ACTIVE.get('configuration') if ACTIVE else {**empty(),**security.defaults()},'legacy':bool(ACTIVE and not ACTIVE.get('configuration'))})
+                elif self.path=='/api/configuration':self.reply(200,{'configuration':ACTIVE.get('configuration') if ACTIVE else {**empty(),**security.defaults(),**networking.defaults()},'legacy':bool(ACTIVE and not ACTIVE.get('configuration'))})
                 elif self.path=='/api/assistant':self.reply(200,{'settings':assistant.load(STATE),'models':assistant.MODELS,'task':assistant.TASK.status()})
                 elif self.path=='/api/switches':self.reply(200,switches.inventory(STATE))
                 elif self.path=='/api/installer':self.reply(200,installer.inventory())
+                elif self.path=='/api/traffic':self.reply(200,traffic.snapshot())
+                elif self.path=='/api/network-services':self.reply(200,networking.health())
                 elif self.path=='/api/security':self.reply(200,security.health())
                 elif self.path=='/api/job':self.reply(200,jobs.status())
                 elif self.path=='/api/rules':self.reply(200,{'rules':run(['nft','list','table','inet','murus_igneus'])})
                 elif self.path=='/api/logs':self.reply(200,{'logs':'\n'.join(x for x in run(['dmesg'],check=False).splitlines() if 'OW policy' in x)[-30000:]})
-                elif self.path in ('/','/app.js','/management.js','/style.css'):
-                    name,mime={'/':('index.html','text/html; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/management.js':('management.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8')}[self.path]
+                elif self.path in ('/','/app.js','/management.js','/network.js','/style.css'):
+                    name,mime={'/':('index.html','text/html; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/management.js':('management.js','text/javascript; charset=utf-8'),'/network.js':('network.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8')}[self.path]
                     self.reply(200,Path(__file__).with_name(name).read_bytes(),mime)
                 else:self.reply(404,{'error':'Risorsa assente'})
         except Exception as e:self.reply(500,{'error':str(e)})
@@ -250,8 +287,10 @@ def main():
             if not plan['ready']:raise Error('Piano salvato non valido')
             settings=plan.get('security',security.defaults());check_vpn_management(settings);security.activate(settings)
             run(['nft','--check','-f','-'],plan['nftables']);network(plan['network_ops'],undo)
+            networking.activate(service_settings(plan),MGMT)
             run(['nft','-f','-'],plan['nftables']);run(['sysctl','-w','net.ipv4.ip_forward=1']);LAST='Configurazione salvata ripristinata';ACTIVE=plan
         except Exception as e:
+            networking.stop()
             for args in reversed(undo):run(args,check=False)
             run(['nft','-f','-'],baseline(MGMT));LAST='Avvio protetto: '+str(e)
     cert,key=STATE/'server.crt',STATE/'server.key'
@@ -268,6 +307,7 @@ if __name__=='__main__':
         with LOCK:
             run(['nft','-f','-'],baseline(MGMT),check=False)
             run(['sysctl','-w','net.ipv4.ip_forward=0'],check=False)
+            networking.stop()
             security.activate(security.defaults())
 
 
