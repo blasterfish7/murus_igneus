@@ -29,6 +29,7 @@ jobs:
         run: python tools/validate-parental-feeds.py
       - name: Save actual feed validation report
         if: github.event_name == 'push'
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: murus-parental-feed-qa
@@ -52,6 +53,7 @@ jobs:
           node tools/prepare-browser.cjs "$RUNNER_TEMP/murus-browser"
           MURUS_PLAYWRIGHT="$RUNNER_TEMP/murus-browser/node_modules/playwright-core" MURUS_CHROMIUM="$RUNNER_TEMP/murus-browser/bin/chromium" node tools/validate-networking-browser.cjs
       - name: Save browser acceptance report
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: murus-native-browser-qa
@@ -60,6 +62,7 @@ jobs:
       - name: Build Devuan package
         run: sh packaging/devuan/build-deb.sh
       - name: Upload Devuan package
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: murus-igneus-devuan-alpha
@@ -76,6 +79,7 @@ jobs:
       - name: Exercise VLAN, DHCP, DNS, DNAT and rollback with real packets
         run: sudo env MURUS_LAB=YES unshare --mount --net --fork python3 tools/validate-native-networking.py
       - name: Save traffic acceptance report
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: murus-native-networking-qa
@@ -102,6 +106,7 @@ jobs:
           sudo env MURUS_LAB=YES unshare --mount --net --fork python3 tools/validate-enterprise-runtime.py || { sudo dmesg | tail -80; exit 1; }
       - name: Save enterprise acceptance report
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: murus-enterprise-runtime-qa
@@ -119,6 +124,7 @@ jobs:
         run: sudo env MURUS_LAB=YES unshare --mount --net --fork python3 tools/validate-parental-runtime.py
       - name: Save parental acceptance report
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: murus-parental-runtime-qa
@@ -126,6 +132,8 @@ jobs:
           retention-days: 14
 
   devuan-iso:
+    permissions:
+      contents: write
     needs: [tests, network-runtime, enterprise-runtime, parental-runtime]
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
@@ -142,7 +150,9 @@ jobs:
       - name: Boot original ISO and run real network acceptance in guest
         run: MURUS_LAB=YES python3 tools/validate-iso-networking.py
       - name: Save ISO, checksums and package manifest
+        id: upload_iso
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: murus-igneus-devuan-iso
@@ -159,3 +169,8 @@ jobs:
 
 
 
+      - name: Preserve tested ISO in a private draft if Actions storage is full
+        if: success() && steps.upload_iso.outcome == 'failure' && github.ref == 'refs/heads/codex/parental-controls'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/stage-candidate-release.py

@@ -114,7 +114,7 @@ ThreadingHTTPServer(('0.0.0.0',8080),HTTP).serve_forever()
         c['policies']=[{'id':'1','name':'LAN WAN','srcintf':['LAN'],'dstintf':['WAN'],'srcaddr':['all'],'dstaddr':['all'],'service':['ALL'],'action':'accept','nat':True,'log':False,'enabled':True}]
         c['dhcp']=[{'interface':'LAN','start':'10.60.0.100','end':'10.60.0.110','lease_hours':12,'dns_servers':['192.0.2.2'],'enabled':True}]
         c['dhcp_reservations']=[{'interface':'LAN','mac':'02:00:00:00:00:01','address':'10.60.0.105','name':'child-device','enabled':True}]
-        c.update(parental.defaults());c['parental'].update(enabled=True,upstream_servers=['192.0.2.2'])
+        c.update(parental.defaults());c['parental'].update(enabled=True,reporting=True,upstream_servers=['192.0.2.2'])
         p={'id':1,'name':'Child lab','enabled':True,'interface':'LAN','clients':['10.60.0.10','10.60.0.105'],'categories':['adult'],'services':['instagram'],'blocked_domains':['blocked.test'],'allowed_domains':['school.blocked.test'],'windows':[],'paused':False,'enforce_dns':True,'block_quic':False}
         c['parental']['profiles']=[p]
         security.write(parental.feed_path('adult',work),json.dumps({'domains':['adult.test'],'category':'adult','updated':time.time(),'sha256':'lab','source':'controlled-fixture'}))
@@ -135,6 +135,21 @@ ThreadingHTTPServer(('0.0.0.0',8080),HTTP).serve_forever()
         ok('Direct DNS-over-TLS on TCP 853 is blocked for protected clients')
         assert http()['status']==200
         ok('Allowed Internet forwarding and SNAT remain operational')
+        # Sample the real named counters and dnsmasq query stream; no fabricated telemetry.
+        time.sleep(.25);parental.REPORTER.collect()
+        report=parental.reporting.report(work)
+        device=next(r for r in report['devices'] if r['client']=='10.60.0.10/32')
+        assert device['upload_bytes']>0 and device['download_bytes']>0,report
+        assert device['blocked_packets']>0,report
+        assert device['dns_queries']>=6 and device['dns_filtered']>=5,report
+        assert any(r['domain']=='instagram.com' and r['filtered']>0 for r in report['domains']),report
+        assert not any(r['client']=='10.60.0.11/32' for r in report['devices']),report
+        ok('Reporting measures actual bidirectional IPv4 counters, DNS requests and filtered domains for assigned devices only')
+        parental.clear_report(work)
+        assert parental.reporting.report(work)['devices']==[]
+        assert http()['status']==200;parental.REPORTER.collect()
+        assert sum(r['upload_bytes'] for r in parental.reporting.report(work)['devices'])>0
+        ok('Clearing live reports resets the baseline without disabling forwarding or recounting old traffic')
         # Check the existing antivirus proxy path with a controlled clean scanner.
         proxy=avproxy.create_proxy({'clients':['10.60.0.0/24'],'upstream_networks':['192.0.2.0/24'],'blocked_domains':[]},lambda data:(True,'fixture'),address=('10.60.0.1',3128))
         threading.Thread(target=proxy.serve_forever,daemon=True).start()
@@ -184,5 +199,5 @@ for line in sys.stdin:
         parental.stop();security.activate(security.defaults());server.networking.stop()
         for process in processes:process.terminate();process.wait(timeout=5)
         for name in ['pc-kid','pc-up']:run(['ip','netns','del',name],check=False)
-        (ROOT/'dist').mkdir(exist_ok=True);(ROOT/'dist/parental-runtime-qa.json').write_text(json.dumps({'success':len(checks)==15,'checks':checks,'scope':'Real dnsmasq/nftables/DHCP/TCP and the actual HTTP proxy with a controlled clean-scanner fixture; no mobile network, real encrypted app efficacy or commercial category certification.'},indent=2))
-assert len(checks)==15,checks
+        (ROOT/'dist').mkdir(exist_ok=True);(ROOT/'dist/parental-runtime-qa.json').write_text(json.dumps({'success':len(checks)==17,'checks':checks,'scope':'Real dnsmasq/nftables/DHCP/TCP and the actual HTTP proxy with a controlled clean-scanner fixture; no mobile network, real encrypted app efficacy or commercial category certification.'},indent=2))
+assert len(checks)==17,checks

@@ -11,11 +11,12 @@ import threading
 import time
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 try:
-    from . import security
+    from . import security, parental_report as reporting
     from .tasks import Task
     from .migration import Error
 except ImportError:
     import security
+    import parental_report as reporting
     from tasks import Task
     from migration import Error
 
@@ -49,11 +50,12 @@ GUARD = None
 BLOCKED = {}
 RUNTIME = {'running': False, 'profiles': [], 'error': ''}
 LAST_RULES = None
+REPORTER = None
 
 
 def defaults():
     return {'parental': {'enabled': False, 'timezone': 'Europe/Rome',
-                         'upstream_servers': ['1.1.1.1', '9.9.9.9'], 'profiles': []}}
+                         'upstream_servers': ['1.1.1.1', '9.9.9.9'], 'profiles': [], 'reporting': False}}
 
 
 def fields(value, allowed):
@@ -97,8 +99,9 @@ def minute(value):
 
 def validate(config, management='eth0'):
     settings = copy.deepcopy(config.get('parental', defaults()['parental']))
-    fields(settings, 'enabled timezone upstream_servers profiles')
-    if set(settings) != set(defaults()['parental']) or type(settings['enabled']) is not bool:
+    settings.setdefault('reporting', False)
+    fields(settings, 'enabled timezone upstream_servers profiles reporting')
+    if set(settings) != set(defaults()['parental']) or type(settings['enabled']) is not bool or type(settings['reporting']) is not bool:
         raise Error('Configurazione parental control incompleta')
     if not isinstance(settings['timezone'], str) or len(settings['timezone']) > 80:
         raise Error('Fuso orario non valido')
@@ -182,19 +185,28 @@ def decorate(plan, settings, interfaces):
              'add rule inet murus_igneus pc_output tcp sport { 53, 12001-12008 } accept',
              'add rule inet murus_igneus pc_output jump pc_schedule',
              'add chain inet murus_igneus pc_dns { type nat hook prerouting priority -110; policy accept; }']
+    lines += reporting.rules(settings, interfaces)
     for row in profiles:
         dev = json.dumps(ports[row['interface']]['device']); clients = '{ ' + ', '.join(row['clients']) + ' }'; port = 12000 + row['id']
-        # Start closed. The runtime evaluates the current local time after all services start.
-        lines += [f'add rule inet murus_igneus pc_schedule iifname {dev} ip saddr {clients} counter drop comment "parental {row["id"]}"',
-                  f'add rule inet murus_igneus pc_schedule oifname {dev} ip daddr {clients} counter drop comment "parental {row["id"]}"']
+        # Start closed. Evaluate local time after all services start.
+        lines += drop_rules(row, settings, interfaces)
         for protocol in ('udp', 'tcp'):
             destination = '' if row['enforce_dns'] else f'ip daddr {ip.IPv4Interface(ports[row["interface"]]["address"]).ip} '
             lines.append(f'add rule inet murus_igneus pc_dns iifname {dev} ip saddr {clients} {destination}{protocol} dport 53 redirect to :{port}')
-        if row['enforce_dns']:
-            for protocol in ('udp', 'tcp'):
-                lines += [f'add rule inet murus_igneus pc_forward iifname {dev} ip saddr {clients} {protocol} dport {{ 53, 853, 784, 8853 }} counter drop']
+        accounting = [r for r in reporting.entities(settings, interfaces) if r['profile'] == row['id']] if settings.get('reporting') else []
+        for protocol in ('udp', 'tcp'):
+            if row['enforce_dns']:
+                if accounting:
+                    for r in accounting:
+                        lines.append(f'add rule inet murus_igneus pc_forward iifname {dev} ip saddr {r["client"]} {protocol} dport {{ 53, 853, 784, 8853 }} counter name {reporting.counter(r, "blocked")} drop')
+                else:
+                    lines.append(f'add rule inet murus_igneus pc_forward iifname {dev} ip saddr {clients} {protocol} dport {{ 53, 853, 784, 8853 }} counter drop')
         if row['block_quic']:
-            lines.append(f'add rule inet murus_igneus pc_forward iifname {dev} ip saddr {clients} udp dport 443 counter drop')
+            if accounting:
+                for r in accounting:
+                    lines.append(f'add rule inet murus_igneus pc_forward iifname {dev} ip saddr {r["client"]} udp dport 443 counter name {reporting.counter(r, "blocked")} drop')
+            else:
+                lines.append(f'add rule inet murus_igneus pc_forward iifname {dev} ip saddr {clients} udp dport 443 counter drop')
         for protocol in ('udp', 'tcp'):
             lines.append(f'add rule inet murus_igneus input iifname {dev} ip saddr {clients} ip daddr {ip.IPv4Interface(ports[row["interface"]]["address"]).ip} {protocol} dport {port} counter accept')
     plan['nftables'] += '\n' + '\n'.join(lines) + '\n'
@@ -281,6 +293,8 @@ def dns_config(profile, settings, interface, feeds, management):
              'listen-address=' + str(ip.IPv4Interface(interface['address']).ip), 'except-interface=lo',
              'except-interface=' + management, 'no-resolv', 'no-hosts', 'no-poll', 'domain-needed', 'bogus-priv',
              'cache-size=512', 'dns-forward-max=50', 'user=root', 'group=root', 'log-facility=-']
+    if settings.get('reporting', False):
+        lines += ['log-queries=extra', 'log-async=20']
     lines += ['server=' + v for v in settings['upstream_servers']]
     lines += ['local=/' + v + '/' for v in sorted(blocked)]
     # A specific allow can override a blocked parent, but never encrypted DNS enforcement domains.
@@ -315,8 +329,22 @@ def pauses(state):
     return json.loads(path.read_text()) if path.exists() else {}
 
 
+def drop_rules(profile, settings, interfaces):
+    dev = json.dumps(next(r['device'] for r in interfaces if r['name'] == profile['interface']))
+    if settings.get('reporting', False):
+        result = []
+        for row in reporting.entities(settings, interfaces):
+            if row['profile'] == profile['id']:
+                for hook, address in [('iifname', 'saddr'), ('oifname', 'daddr')]:
+                    result.append(f'add rule inet murus_igneus pc_schedule {hook} {dev} ip {address} {row["client"]} counter name {reporting.counter(row, "blocked")} drop')
+        return result
+    clients = '{ ' + ', '.join(profile['clients']) + ' }'
+    return [f'add rule inet murus_igneus pc_schedule iifname {dev} ip saddr {clients} counter drop comment "parental {profile["id"]}"',
+            f'add rule inet murus_igneus pc_schedule oifname {dev} ip daddr {clients} counter drop comment "parental {profile["id"]}"']
+
+
 def schedule_rules(settings, interfaces, overrides, now=None, ready=None):
-    ports = {r['name']: r for r in interfaces}; lines = ['flush chain inet murus_igneus pc_schedule']; rows = []
+    lines = ['flush chain inet murus_igneus pc_schedule']; rows = []
     stamp = time.time() if now is None else now.timestamp()
     for p in active_profiles(settings):
         temporary = overrides.get(fingerprint(p), 0)
@@ -325,9 +353,7 @@ def schedule_rules(settings, interfaces, overrides, now=None, ready=None):
         rows.append({'id': p['id'], 'name': p['name'], 'blocked': bool(reason), 'reason': reason,
                      'pause_until': temporary if temporary > stamp else None, 'resolver_running': not failed})
         if reason:
-            dev = json.dumps(ports[p['interface']]['device']); clients = '{ ' + ', '.join(p['clients']) + ' }'
-            lines += [f'add rule inet murus_igneus pc_schedule iifname {dev} ip saddr {clients} counter drop comment "parental {p["id"]}"',
-                      f'add rule inet murus_igneus pc_schedule oifname {dev} ip daddr {clients} counter drop comment "parental {p["id"]}"']
+            lines += drop_rules(p, settings, interfaces)
     return '\n'.join(lines) + '\n', rows
 
 
@@ -366,7 +392,7 @@ def pause(ident, minutes):
 
 
 def stop():
-    global THREAD, CURRENT, LAST_RULES
+    global THREAD, CURRENT, LAST_RULES, REPORTER
     STOP.set()
     if THREAD is not None:
         THREAD.join(); THREAD = None
@@ -375,11 +401,13 @@ def stop():
         for name in list(security.PROCESSES):
             if name.startswith('parental-'):
                 security.stop(name)
+        if REPORTER is not None:
+            REPORTER.stop(); REPORTER = None
         RUNTIME.update(running=False, profiles=[], error='')
 
 
 def activate(plan, state, management):
-    global STATE, CURRENT, THREAD
+    global STATE, CURRENT, THREAD, REPORTER
     stage(plan)
     stop(); STATE = Path(state)
     if not plan or not active_profiles(plan['settings']):
@@ -387,15 +415,23 @@ def activate(plan, state, management):
     settings = plan['settings']; profiles = active_profiles(settings); ports = {r['name']: r for r in plan['interfaces']}
     feeds = load_domains(settings, STATE)
     try:
+        if settings.get('reporting', False):
+            REPORTER = reporting.Collector(settings, plan['interfaces'], STATE)
         for profile in profiles:
             name = 'parental-' + str(profile['id']); path = security.RUN / (name + '.conf')
             security.write(path, dns_config(profile, settings, ports[profile['interface']], feeds, management))
             security.command(['dnsmasq', '--test', '--conf-file=' + str(path)])
-            security.spawn(name, ['dnsmasq', '--keep-in-foreground', '--conf-file=' + str(path), '--pid-file='])
+            args = ['dnsmasq', '--keep-in-foreground', '--conf-file=' + str(path), '--pid-file=']
+            if REPORTER is not None:
+                REPORTER.spawn(profile['id'], name, args)
+            else:
+                security.spawn(name, args)
         time.sleep(.25)
         if any(security.PROCESSES['parental-' + str(p['id'])].poll() is not None for p in profiles):
             raise Error('Resolver parental non avviato; verificare indirizzi e porte')
         CURRENT = copy.deepcopy(plan); tick(); STOP.clear()
+        if REPORTER is not None:
+            REPORTER.start()
         def worker():
             while not STOP.wait(2):
                 try:
@@ -458,3 +494,12 @@ def proxy_allowed(client, hostname):
 def preflight(plan, state):
     if plan and active_profiles(plan['settings']):
         load_domains(plan['settings'], state)
+
+
+def clear_report(state):
+    with LOCK:
+        if REPORTER is not None:
+            REPORTER.clear()
+        else:
+            reporting.erase(state)
+    return {'ok': True}

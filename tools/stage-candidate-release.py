@@ -1,0 +1,66 @@
+"""Preserve a validated candidate when Actions storage is full. Never publish a release."""
+import hashlib
+import json
+import os
+from pathlib import Path
+import urllib.parse
+import urllib.request
+
+ROOT = Path(__file__).resolve().parents[1]
+REPO = os.environ['GITHUB_REPOSITORY']
+assert REPO == 'blasterfish7/murus_igneus'
+SHA = os.environ['GITHUB_SHA']; RUN = os.environ['GITHUB_RUN_ID']
+assert len(SHA) == 40 and all(c in '0123456789abcdef' for c in SHA) and RUN.isdigit()
+assert os.environ['GITHUB_REF'] == 'refs/heads/codex/parental-controls'
+API = 'https://api.github.com/repos/' + REPO
+
+
+def request(url, data=None, method='GET', content_type='application/json'):
+    if not url.startswith((API + '/', 'https://uploads.github.com/repos/' + REPO + '/releases/')):
+        raise ValueError('Unexpected API destination')
+    req = urllib.request.Request(url, data=data, method=method, headers={
+        'Authorization': 'Bearer ' + os.environ['GH_TOKEN'], 'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': content_type})
+    with urllib.request.urlopen(req, timeout=300) as response:
+        return json.load(response)
+
+
+out = ROOT / 'dist'
+qa = json.loads((out / 'alpha6-iso-networking-qa.json').read_text())
+assert qa['success'] and len(qa['checks']) == 42, qa
+iso = out / 'murus-igneus-0.3.0-alpha.6-devuan-amd64.iso'
+with iso.open('rb') as f:
+    digest = hashlib.file_digest(f, 'sha256').hexdigest()
+assert qa['iso'] == iso.name and qa['sha256'] == digest
+assert (out / 'SHA256SUMS').read_text().strip() == digest + '  ' + iso.name
+files = [iso, out / 'murus-igneus_0.3.0~alpha.6_all.deb', out / 'alpha6-iso-networking-qa.json',
+         out / 'SHA256SUMS', out / 'packages-devuan.tsv', out / 'signature-status.txt']
+manifest = {'source_sha': SHA, 'run_id': RUN, 'iso_checks': 42, 'files': {}}
+for file in files:
+    assert file.is_file() and file.stat().st_size > 0
+    with file.open('rb') as f:
+        manifest['files'][file.name.replace('~', '-')] = {'size': file.stat().st_size, 'sha256': hashlib.file_digest(f, 'sha256').hexdigest()}
+manifest_path = out / 'candidate-validation.json'; manifest_path.write_text(json.dumps(manifest, indent=2) + '\n'); files.append(manifest_path)
+tag = 'candidate-alpha6-' + SHA[:12] + '-' + RUN
+existing = request(API + '/releases?per_page=100')
+release = next((r for r in existing if r['tag_name'] == tag), None)
+if release is None:
+    body = {'tag_name': tag, 'target_commitish': SHA, 'name': 'Validated alpha.6 candidate ' + SHA[:12],
+            'draft': True, 'prerelease': True, 'body': 'Private draft preserving the original tested build while Actions artifact storage is full. Source: ' + SHA + '. CI run: ' + RUN + '. ISO: 42 UEFI/live and packet checks. Not a published release.'}
+    release = request(API + '/releases', json.dumps(body).encode(), 'POST')
+assert release['draft'] and release['target_commitish'] == SHA
+for file in files:
+    name = file.name.replace('~', '-')
+    with file.open('rb') as f:
+        data = f.read()
+    expected = 'sha256:' + hashlib.sha256(data).hexdigest()
+    old = next((a for a in release['assets'] if a['name'] == name), None)
+    if old is None:
+        asset = request('https://uploads.github.com/repos/' + REPO + '/releases/' + str(release['id']) + '/assets?name=' + urllib.parse.quote(name), data, 'POST', 'application/octet-stream')
+    else:
+        asset = old
+    assert asset.get('digest') == expected and asset['size'] == len(data), asset
+    print('Verified draft asset:', name, expected, flush=True)
+print('CANDIDATE_DRAFT=' + release['html_url'], flush=True)
+with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+    f.write('## Validated candidate preserved\n\nDraft release: ' + release['html_url'] + '\n\nOriginal ISO SHA256: `' + digest + '`\n\nNot published.\n')

@@ -118,9 +118,9 @@ print('ISO_ROOT_PARENTAL_APPLY_ROLLBACK_OK')
         command("python3 -c \"import base64,gzip;from pathlib import Path;Path('/tmp/murus-qa/tools/validate-parental-runtime.py').write_bytes(gzip.decompress(base64.b64decode(Path('/tmp/murus-qa/parental.b64').read_bytes())))\"")
         command('MURUS_LAB=YES unshare --mount --net --fork python3 /tmp/murus-qa/tools/validate-parental-runtime.py', timeout=360)
         parental_report = json.loads(re.search(r'MIQA_PARENTAL=(\{[^\r\n]+\})', command("python3 -c \"import json;print('MIQA_PARENTAL='+json.dumps(json.load(open('/tmp/murus-qa/dist/parental-runtime-qa.json'))))\"")).group(1))
-        assert parental_report['success'] and len(parental_report['checks']) == 15, parental_report
+        assert parental_report['success'] and len(parental_report['checks']) == 17, parental_report
         checks += ['Devuan ISO: ' + item for item in parental_report['checks']]
-        print('PASS parental packet suite on original ISO: 15 checks', flush=True)
+        print('PASS parental packet suite on original ISO: 17 checks', flush=True)
         child.sendline('poweroff'); child.expect(pexpect.EOF, timeout=300)
         checks.append('Graceful live VM poweroff'); print('PASS ' + checks[-1], flush=True)
         with iso.open('rb') as file:

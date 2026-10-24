@@ -151,6 +151,7 @@ def rollback(ident):
 def apply(plan):
     global PENDING,LAST
     if PENDING or jobs.busy():raise Error('Confermare la modifica o attendere la manutenzione in corso')
+    if (parental.TASK.status() or {}).get('state')=='running':raise Error('Attendere l’aggiornamento delle liste parental')
     if (switches.TASK.status() or {}).get('state')=='running':raise Error('Attendere l’operazione switch prima di applicare il firewall')
     if not plan or not plan['ready']:raise Error('Migrazione non validata o con incompatibilità')
     parental.preflight(plan.get('parental'),STATE)
@@ -220,6 +221,7 @@ class Handler(BaseHTTPRequestHandler):
             with LOCK:
                 if self.path=='/api/auth/status':self.reply(200,{'enabled':bool(authentication.read(STATE)),'verified':self.mfa_session(),'csrf':CSRF})
                 elif self.path=='/api/events':self.reply(200,eventlog.history(STATE))
+                elif self.path in ('/api/parental/report/1','/api/parental/report/7'):self.reply(200,parental.reporting.report(STATE,int(self.path[-1])))
                 elif self.path=='/api/parental':self.reply(200,parental.inventory(STATE))
                 elif self.path=='/api/enterprise':self.reply(200,enterprise.health())
                 elif self.path=='/api/status':
@@ -250,7 +252,12 @@ class Handler(BaseHTTPRequestHandler):
             data=json.loads(self.rfile.read(length))
             if not isinstance(data,dict):raise Error('Richiesta non valida')
             with LOCK:
-                if self.path in ('/api/parental/update','/api/parental/pause'):
+                if self.path in ('/api/parental/report/export','/api/parental/report/clear'):
+                    if self.path.endswith('/clear'):
+                        if data.get('confirm') is not True:raise Error('Conferma cancellazione richiesta')
+                        self.reply(200,parental.clear_report(STATE))
+                    else:self.reply(200,{'csv':parental.reporting.export_csv(parental.reporting.report(STATE,data.get('days',7)))})
+                elif self.path in ('/api/parental/update','/api/parental/pause'):
                     if PENDING or jobs.busy():raise Error('Confermare prima la modifica o attendere la manutenzione')
                     if self.path=='/api/parental/update':self.reply(200,parental.update_feed(STATE,data.get('category')))
                     else:self.reply(200,parental.pause(data.get('id'),data.get('minutes')))
@@ -355,7 +362,7 @@ def main():
     cert,key=STATE/'server.crt',STATE/'server.key'
     if not cert.exists() or not key.exists():
         run(['openssl','req','-x509','-newkey','rsa:2048','-sha256','-nodes','-days','3650','-subj','/CN=murus_igneus.local','-keyout',str(key),'-out',str(cert)]);key.chmod(0o600)
-    eventlog.start(STATE)
+    eventlog.start(STATE);parental.reporting.start_retention(STATE)
     make_server('0.0.0.0',8443,cert,key).serve_forever()
 
 if __name__=='__main__':

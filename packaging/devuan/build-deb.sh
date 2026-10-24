@@ -9,7 +9,7 @@ output=$(CDPATH='' cd -- "$output" && pwd)
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT HUP INT TERM
 install -d "$stage/DEBIAN" "$stage/usr/lib/murus-igneus" "$stage/usr/sbin" "$stage/etc/init.d" "$stage/etc/default" "$stage/usr/share/doc/murus-igneus" "$stage/etc/sysctl.d"
-for file in __init__.py server.py configuration.py migration.py security.py avproxy.py jobs.py installer.py networking.py traffic.py parental.py parental.js eventlog.py authentication.py enterprise.py enterprise.js updates.py network.js tasks.py assistant.py switches.py management.js index.html app.js style.css LICENSE-MIT; do
+for file in __init__.py server.py configuration.py migration.py security.py avproxy.py jobs.py installer.py networking.py traffic.py parental_report.py parental.py parental.js eventlog.py authentication.py enterprise.py enterprise.js updates.py network.js tasks.py assistant.py switches.py management.js index.html app.js style.css LICENSE-MIT; do
     install -m 0644 "$root/src/murus_igneus/$file" "$stage/usr/lib/murus-igneus/$file"
 done
 for file in murus-serve murus-prepare murus-info murus-update; do
