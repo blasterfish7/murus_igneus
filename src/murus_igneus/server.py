@@ -18,11 +18,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 try:
     from .migration import VERSION, baseline, Error
     from .configuration import compile_config, from_backup, empty
-    from . import security, installer, jobs, assistant, switches, networking, traffic, enterprise, authentication, eventlog
+    from . import security, installer, jobs, assistant, switches, networking, traffic, enterprise, authentication, eventlog, parental
 except ImportError:
     from migration import VERSION, baseline, Error
     from configuration import compile_config, from_backup, empty
-    import security, installer, jobs, assistant, switches, networking, traffic, enterprise, authentication, eventlog
+    import security, installer, jobs, assistant, switches, networking, traffic, enterprise, authentication, eventlog, parental
 
 STATE=Path('/etc/murus_igneus');MGMT=os.environ.get('MURUS_MANAGEMENT_INTERFACE','eth0');LOCK=threading.RLock()
 if not re.fullmatch(r'[A-Za-z0-9_.-]{1,15}',MGMT) or MGMT=='lo':raise ValueError('Interfaccia di gestione non valida')
@@ -128,6 +128,7 @@ def rollback(ident):
         if not PENDING or PENDING['id']!=ident:return
         p=PENDING
         run(['nft','-f','-'],baseline(MGMT))
+        parental.stop()
         enterprise.stop()
         networking.stop()
         for args in reversed(p['undo']):run(args,check=False)
@@ -137,7 +138,12 @@ def rollback(ident):
             networking.activate(service_settings(ACTIVE),MGMT)
             enterprise.activate(ACTIVE.get('enterprise',enterprise.defaults()) if ACTIVE else enterprise.defaults(), ACTIVE.get('configuration',{}).get('interfaces',[]) if ACTIVE else [])
         except Exception as e:service_error=str(e)
-        run(['nft','-f','-'],p['old']);run(['conntrack','-F'],check=False)
+        parental.stage(ACTIVE.get('parental') if ACTIVE else None)
+        run(['nft','-f','-'],p['old'])
+        try:parental.activate(ACTIVE.get('parental') if ACTIVE else None,STATE,MGMT)
+        except Exception as e:service_error=str(e)
+        if service_error:run(['nft','-f','-'],baseline(MGMT))
+        run(['conntrack','-F'],check=False)
         run(['sysctl','-w','net.ipv4.ip_forward='+p['forward']],check=False)
         PENDING=None;LAST='Modifica annullata; ripristinata la configurazione precedente'
         if service_error:LAST='Ripristino servizi fallito: '+service_error
@@ -145,14 +151,17 @@ def rollback(ident):
 def apply(plan):
     global PENDING,LAST
     if PENDING or jobs.busy():raise Error('Confermare la modifica o attendere la manutenzione in corso')
+    if (parental.TASK.status() or {}).get('state')=='running':raise Error('Attendere l’aggiornamento delle liste parental')
     if (switches.TASK.status() or {}).get('state')=='running':raise Error('Attendere l’operazione switch prima di applicare il firewall')
     if not plan or not plan['ready']:raise Error('Migrazione non validata o con incompatibilità')
+    parental.preflight(plan.get('parental'),STATE)
     check_enterprise_management(plan)
     run(['nft','--check','-f','-'],plan['nftables'])
     old=run(['nft','list','table','inet','murus_igneus']);ident=secrets.token_hex(16)
     PENDING={'id':ident,'deadline':time.time()+90,'undo':[],'old':'add table inet murus_igneus\nflush table inet murus_igneus\n'+old,'forward':Path('/proc/sys/net/ipv4/ip_forward').read_text().strip(),'plan':plan,'security':ACTIVE.get('security',security.defaults()) if ACTIVE else security.defaults()}
     try:
         run(['nft','-f','-'],baseline(MGMT))
+        parental.stop()
         enterprise.stop()
         networking.stop()
         remove_previous(ACTIVE['network_ops'] if ACTIVE else [],plan['network_ops'],PENDING['undo'])
@@ -161,8 +170,10 @@ def apply(plan):
         security.activate(settings)
         network(plan['network_ops'],PENDING['undo'])
         networking.activate(service_settings(plan),MGMT)
+        parental.stage(plan.get('parental'))
         enterprise.activate(plan.get('enterprise',enterprise.defaults()),plan.get('configuration',{}).get('interfaces',[]))
         run(['nft','-f','-'],plan['nftables'])
+        parental.activate(plan.get('parental'),STATE,MGMT)
         run(['conntrack','-F']);run(['sysctl','-w','net.ipv4.ip_forward=1'])
     except Exception:
         rollback(ident);raise
@@ -185,7 +196,7 @@ class Handler(BaseHTTPRequestHandler):
             h=self.headers.get('Authorization','');actual=base64.b64decode(h[6:],validate=True).decode() if h.startswith('Basic ') else ''
         except Exception:actual=''
         if hmac.compare_digest(hashlib.sha256(actual.encode()).digest(),hashlib.sha256(expected.encode()).digest()):
-            if authentication.read(STATE) and not self.mfa_session() and self.path not in ('/', '/app.js', '/management.js', '/network.js', '/enterprise.js', '/style.css', '/api/auth/status', '/api/auth/verify'):
+            if authentication.read(STATE) and not self.mfa_session() and self.path not in ('/', '/app.js', '/management.js', '/network.js', '/enterprise.js', '/parental.js', '/style.css', '/api/auth/status', '/api/auth/verify'):
                 self.reply(403,{'error':'Inserire il codice TOTP', 'mfa_required':True});return False
             return True
         self.send_response(401);self.send_header('WWW-Authenticate','Basic realm="Murus Igneus", charset="UTF-8"');self.send_header('Content-Length','0');self.end_headers();return False
@@ -210,11 +221,13 @@ class Handler(BaseHTTPRequestHandler):
             with LOCK:
                 if self.path=='/api/auth/status':self.reply(200,{'enabled':bool(authentication.read(STATE)),'verified':self.mfa_session(),'csrf':CSRF})
                 elif self.path=='/api/events':self.reply(200,eventlog.history(STATE))
+                elif self.path in ('/api/parental/report/1','/api/parental/report/7'):self.reply(200,parental.reporting.report(STATE,int(self.path[-1])))
+                elif self.path=='/api/parental':self.reply(200,parental.inventory(STATE))
                 elif self.path=='/api/enterprise':self.reply(200,enterprise.health())
                 elif self.path=='/api/status':
                     links=json.loads(run(['ip','-j','link']))
                     self.reply(200,{'version':VERSION,'csrf':CSRF,'management':MGMT,'links':[x['ifname'] for x in links if x['ifname'] not in (MGMT,'lo')],'last':LAST,'maintenance':jobs.busy(),'pending':{'id':PENDING['id'],'deadline':PENDING['deadline'],'remaining':max(0,PENDING['deadline']-time.time())} if PENDING else None})
-                elif self.path=='/api/configuration':self.reply(200,{'configuration':ACTIVE.get('configuration') if ACTIVE else {**empty(),**security.defaults(),**networking.defaults(),**enterprise.defaults()},'legacy':bool(ACTIVE and not ACTIVE.get('configuration'))})
+                elif self.path=='/api/configuration':self.reply(200,{'configuration':ACTIVE.get('configuration') if ACTIVE else {**empty(),**security.defaults(),**networking.defaults(),**enterprise.defaults(),**parental.defaults()},'legacy':bool(ACTIVE and not ACTIVE.get('configuration'))})
                 elif self.path=='/api/assistant':self.reply(200,{'settings':{**assistant.load(STATE),'key_configured':(STATE/'openai.key').exists()},'models':assistant.MODELS,'task':assistant.TASK.status()})
                 elif self.path=='/api/switches':self.reply(200,switches.inventory(STATE))
                 elif self.path=='/api/installer':self.reply(200,installer.inventory())
@@ -224,8 +237,8 @@ class Handler(BaseHTTPRequestHandler):
                 elif self.path=='/api/job':self.reply(200,jobs.status())
                 elif self.path=='/api/rules':self.reply(200,{'rules':run(['nft','list','table','inet','murus_igneus'])})
                 elif self.path=='/api/logs':self.reply(200,{'logs':'\n'.join(x for x in run(['dmesg'],check=False).splitlines() if 'OW policy' in x)[-30000:]})
-                elif self.path in ('/','/app.js','/management.js','/network.js','/enterprise.js','/style.css'):
-                    name,mime={'/':('index.html','text/html; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/management.js':('management.js','text/javascript; charset=utf-8'),'/network.js':('network.js','text/javascript; charset=utf-8'),'/enterprise.js':('enterprise.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8')}[self.path]
+                elif self.path in ('/','/app.js','/management.js','/network.js','/enterprise.js','/parental.js','/style.css'):
+                    name,mime={'/':('index.html','text/html; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/management.js':('management.js','text/javascript; charset=utf-8'),'/network.js':('network.js','text/javascript; charset=utf-8'),'/enterprise.js':('enterprise.js','text/javascript; charset=utf-8'),'/parental.js':('parental.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8')}[self.path]
                     self.reply(200,Path(__file__).with_name(name).read_bytes(),mime)
                 else:self.reply(404,{'error':'Risorsa assente'})
         except Exception as e:self.reply(500,{'error':str(e)})
@@ -239,7 +252,16 @@ class Handler(BaseHTTPRequestHandler):
             data=json.loads(self.rfile.read(length))
             if not isinstance(data,dict):raise Error('Richiesta non valida')
             with LOCK:
-                if self.path=='/api/auth/verify':
+                if self.path in ('/api/parental/report/export','/api/parental/report/clear'):
+                    if self.path.endswith('/clear'):
+                        if data.get('confirm') is not True:raise Error('Conferma cancellazione richiesta')
+                        self.reply(200,parental.clear_report(STATE))
+                    else:self.reply(200,{'csv':parental.reporting.export_csv(parental.reporting.report(STATE,data.get('days',7)))})
+                elif self.path in ('/api/parental/update','/api/parental/pause'):
+                    if PENDING or jobs.busy():raise Error('Confermare prima la modifica o attendere la manutenzione')
+                    if self.path=='/api/parental/update':self.reply(200,parental.update_feed(STATE,data.get('category')))
+                    else:self.reply(200,parental.pause(data.get('id'),data.get('minutes')))
+                elif self.path=='/api/auth/verify':
                     self.mfa_cookie=authentication.authenticate(STATE,data.get('code'),self.client_address[0]);self.reply(200,{'ok':True})
                 elif self.path=='/api/auth/enroll':self.reply(200,authentication.enroll(STATE))
                 elif self.path=='/api/auth/confirm':
@@ -327,8 +349,12 @@ def main():
             run(['nft','--check','-f','-'],plan['nftables']);network(plan['network_ops'],undo)
             networking.activate(service_settings(plan),MGMT)
             enterprise.activate(plan.get('enterprise',enterprise.defaults()),plan.get('configuration',{}).get('interfaces',[]))
-            run(['nft','-f','-'],plan['nftables']);run(['sysctl','-w','net.ipv4.ip_forward=1']);LAST='Configurazione salvata ripristinata';ACTIVE=plan
+            parental.stage(plan.get('parental'))
+            run(['nft','-f','-'],plan['nftables'])
+            parental.activate(plan.get('parental'),STATE,MGMT)
+            run(['sysctl','-w','net.ipv4.ip_forward=1']);LAST='Configurazione salvata ripristinata';ACTIVE=plan
         except Exception as e:
+            parental.stop()
             enterprise.stop()
             networking.stop()
             for args in reversed(undo):run(args,check=False)
@@ -336,7 +362,7 @@ def main():
     cert,key=STATE/'server.crt',STATE/'server.key'
     if not cert.exists() or not key.exists():
         run(['openssl','req','-x509','-newkey','rsa:2048','-sha256','-nodes','-days','3650','-subj','/CN=murus_igneus.local','-keyout',str(key),'-out',str(cert)]);key.chmod(0o600)
-    eventlog.start(STATE)
+    eventlog.start(STATE);parental.reporting.start_retention(STATE)
     make_server('0.0.0.0',8443,cert,key).serve_forever()
 
 if __name__=='__main__':
@@ -348,6 +374,7 @@ if __name__=='__main__':
         with LOCK:
             run(['nft','-f','-'],baseline(MGMT),check=False)
             run(['sysctl','-w','net.ipv4.ip_forward=0'],check=False)
+            parental.stop()
             enterprise.stop()
             networking.stop()
             security.activate(security.defaults())

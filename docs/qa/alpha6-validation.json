@@ -1,0 +1,15 @@
+{
+  "version": "0.3.0-alpha.6",
+  "source_sha": "fe201577f6e3b4d8f39f2391935076c826dedcca",
+  "run_id": 40136817311,
+  "python_tests": 167,
+  "python_skips": 0,
+  "chromium_checks": 10,
+  "native_packet_checks": 11,
+  "enterprise_packet_checks": 9,
+  "parental_packet_checks": 17,
+  "real_https_category_feeds": 4,
+  "iso_uefi_checks": 42,
+  "iso_sha256": "eb48a856c22ec9eab7127e9e57ea0739bf25e8e6f7d0337a585e1bc9ac63663f",
+  "scope": "Disposable namespace and QEMU TCG UEFI live tests. No disk installation, physical hardware, FortiGate interoperability or complete UTM efficacy certification. See docs/ISO-ALPHA6-QA.md."
+}

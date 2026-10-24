@@ -138,10 +138,12 @@ _compile_base=compile_config
 def compile_config(config,management='eth0'):
     import copy
     try:
-        from . import security, networking, enterprise
+        from . import security, networking, enterprise, parental
     except ImportError:
-        import security, networking, enterprise
+        import security, networking, enterprise, parental
     if not isinstance(config,dict):raise Error('Configurazione non valida')
+    parent_settings=parental.validate(config,management)
+    config={k:v for k,v in config.items() if k!='parental'}
     extensions=enterprise.validate(config,management)
     config={k:v for k,v in config.items() if k not in extensions}
     settings=security.validate(config,management)
@@ -170,6 +172,7 @@ def compile_config(config,management='eth0'):
     networking.decorate(plan,interfaces,services,vlans)
     plan['configuration'].update(extensions);plan['enterprise']=extensions
     plan['nftables']=enterprise.decorate(plan['nftables'],extensions,interfaces)
+    parental.decorate(plan,parent_settings,interfaces)
     plan['version']=VERSION
     return plan
 

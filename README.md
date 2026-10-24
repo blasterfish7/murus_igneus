@@ -13,3 +13,6 @@ Validated: 138 Python tests without skips, 8 Chromium checks, 20 packet checks a
 No Fortinet code, firmware or assets are reused.
 
 See [alpha.5 setup and limitations](docs/ALPHA5.md), [ISO acceptance](docs/ISO-ALPHA5-QA.md), [native networking](docs/NATIVE-NETWORKING.md), [AI and switches](docs/AI-SWITCHES.md), [Devuan build/install](docs/DEVUAN.md) and [source/verification status](SOURCE_STATUS.md).
+
+
+Parental control alpha.6 in sviluppo: [profili, filtri e limiti](docs/PARENTAL.md). La release pubblicata resta alpha.5 finché il nuovo artefatto non è collaudato e pubblicato.
