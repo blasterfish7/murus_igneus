@@ -13,12 +13,12 @@ except ImportError:
     from migration import Error
     import security
 
-EXTRA = ('dhcp', 'dns', 'port_forwards')
+EXTRA = ('dhcp', 'dns', 'port_forwards', 'dhcp_reservations')
 VLAN_ALIAS = 'murus-igneus-vlan'
 
 
 def defaults():
-    return {'dhcp': [], 'dns': {'enabled': False, 'interfaces': [], 'upstream_servers': [], 'domain': 'lan'}, 'port_forwards': []}
+    return {'dhcp_reservations': [], 'dhcp': [], 'dns': {'enabled': False, 'interfaces': [], 'upstream_servers': [], 'domain': 'lan'}, 'port_forwards': []}
 
 
 def fields(row, allowed):
@@ -137,6 +137,23 @@ def prepare(config, management):
         row['dns_servers'] = list(dict.fromkeys(host(s) for s in servers))
         if enabled(row) and not servers and not (dns['enabled'] and name in dns['interfaces']):
             raise Error('DHCP: indicare resolver oppure abilitare DNS sulla stessa interfaccia')
+    macs = set(); addresses = set()
+    for row in rows('dhcp_reservations'):
+        fields(row, 'interface mac address name enabled'); enabled(row)
+        port = interface(row.get('interface')); address = ip.IPv4Interface(port['address'])
+        if row['interface'] not in {p['interface'] for p in settings['dhcp'] if enabled(p)}:
+            raise Error('La prenotazione richiede un pool DHCP abilitato sulla stessa interfaccia')
+        mac = row.get('mac')
+        if not isinstance(mac, str) or not re.fullmatch(r'(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}',mac) or int(mac[:2],16)&1 or mac.lower()=='00:00:00:00:00:00':
+            raise Error('MAC unicast non valido')
+        row['mac']=mac.lower(); row['address']=host(row.get('address')); reserved=ip.IPv4Address(row['address'])
+        if reserved not in address.network or reserved in (address.ip,address.network.network_address,address.network.broadcast_address):
+            raise Error('IPv4 prenotato fuori subnet o riservato')
+        if not isinstance(row.get('name'),str) or not re.fullmatch(r'[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?',row['name']):
+            raise Error('Nome dispositivo DHCP: usare lettere, numeri e trattini')
+        if enabled(row) and (row['mac'] in macs or row['address'] in addresses):
+            raise Error('MAC o IPv4 prenotato duplicato')
+        if enabled(row):macs.add(row['mac']); addresses.add(row['address'])
     ids = set(); bindings = set()
     for row in rows('port_forwards'):
         fields(row, 'id name interface public_ip protocol external_port target_interface target_ip target_port source enabled log')
@@ -236,6 +253,8 @@ def dnsmasq_config(settings, management):
             f'dhcp-range=set:{tag},{row["start"]},{row["end"]},{a.netmask},{row["lease_hours"]}h',
             f'dhcp-option=tag:{tag},option:router,{a.ip}',
             f'dhcp-option=tag:{tag},option:dns-server,' + ','.join(row['dns_servers'] or [str(a.ip)])])
+    for row in settings.get('dhcp_reservations', []):
+        if enabled(row):lines.append('dhcp-host='+row['mac']+','+row['address']+','+row['name'])
     return '\n'.join(lines) + '\n'
 
 

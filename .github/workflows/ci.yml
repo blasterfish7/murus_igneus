@@ -24,6 +24,16 @@ jobs:
           python -m ruff check --select F,E9 src tests
       - name: Migration regression tests
         run: python -m unittest discover -s tests -p 'test_*.py' -v
+      - name: Validate actual parental category downloads
+        if: github.event_name == 'push'
+        run: python tools/validate-parental-feeds.py
+      - name: Save actual feed validation report
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: murus-parental-feed-qa
+          path: dist/parental-feed-qa.json
+          retention-days: 14
       - name: Shell and JavaScript syntax
         run: |
           sh -n packaging/devuan/build-deb.sh
@@ -33,6 +43,7 @@ jobs:
           node --check src/murus_igneus/management.js
           node --check src/murus_igneus/network.js
           node --check src/murus_igneus/enterprise.js
+          node --check src/murus_igneus/parental.js
           node tests/test_management_ui.js
           node tests/test_network_ui.js
       - name: Real Chromium native configuration GUI
@@ -97,8 +108,25 @@ jobs:
           path: dist/enterprise-runtime-qa.json
           retention-days: 14
 
+  parental-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install parental packet lab tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nftables iproute2 conntrack dnsmasq-base
+      - name: Test actual DNS, schedules, pauses, reservations and local proxy
+        run: sudo env MURUS_LAB=YES unshare --mount --net --fork python3 tools/validate-parental-runtime.py
+      - name: Save parental acceptance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: murus-parental-runtime-qa
+          path: dist/parental-runtime-qa.json
+          retention-days: 14
+
   devuan-iso:
-    needs: [tests, network-runtime, enterprise-runtime]
+    needs: [tests, network-runtime, enterprise-runtime, parental-runtime]
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -124,8 +152,8 @@ jobs:
             dist/packages-devuan.tsv
             dist/signature-status.txt
             dist/clamav-build.log
-            dist/alpha5-iso-networking-qa.json
-            dist/alpha5-iso-console.log
+            dist/alpha6-iso-networking-qa.json
+            dist/alpha6-iso-console.log
           compression-level: 0
           retention-days: 14
 

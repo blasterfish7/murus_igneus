@@ -31,6 +31,11 @@ def create_proxy(config,scan,address=('0.0.0.0',3128)):
                 if url.scheme!='http' or not url.hostname or url.username or url.password or url.fragment: return self.send_error(400,'Use an absolute HTTP URL')
                 host=url.hostname.lower().rstrip('.')
                 if any(host==d or host.endswith('.'+d) for d in domains):return self.send_error(403,'Domain blocked')
+                try:
+                    from . import parental
+                except ImportError:
+                    import parental
+                if not parental.proxy_allowed(self.client_address[0],host):return self.send_error(403,'Parental profile blocked this request')
                 candidates={r[4][0] for r in socket.getaddrinfo(host,url.port or 80,socket.AF_INET,socket.SOCK_STREAM)}
                 safe=[a for a in candidates if (ip.IPv4Address(a).is_global or any(ip.IPv4Address(a) in n for n in allowed)) and not ip.IPv4Address(a).is_loopback and not ip.IPv4Address(a).is_link_local and not ip.IPv4Address(a).is_multicast and a not in local_addresses()]
                 if not safe:return self.send_error(403,'Destination is not authorized')
