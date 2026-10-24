@@ -40,7 +40,7 @@ Per impostazione predefinita non si registrano query DNS. Abilitando il reportin
 Suite Python su validazione, IDNA, iniezioni, orari, mezzanotte, DST, feed e pause. GUI Chromium con compilatore reale. Laboratorio `tools/validate-parental-runtime.py` con veri dnsmasq, nftables, query DNS UDP/TCP, traffico TCP, proxy con scanner controllato, DHCP DORA, arresto resolver e rollback. Non è un test di efficacia commerciale su tutte le categorie o su tutte le applicazioni.
 
 
-## Reporting locale (alpha.6 in sviluppo)
+## Reporting locale (alpha.6)
 
 Dalla pagina Parental control attivare **Abilita reporting locale**, salvare la bozza e applicarla. È disabilitato per impostazione predefinita e rimane facoltativo con i vecchi backup. Dopo circa 10 secondi premere Aggiorna report. Sono disponibili 24 ore o 7 giorni, selezione IPv4/subnet, upload/download, andamento orario, pacchetti bloccati dal parental e primi 100 domini DNS globali nel periodo, con il numero di richieste e risposte NXDOMAIN del filtro locale. L'esportazione CSV comprende il periodo completo e tutti i profili, indipendentemente dal filtro di visualizzazione. La cancellazione richiede conferma ed elimina lo storico di tutti i profili; se la raccolta è attiva riprende con nuovi dati.
 

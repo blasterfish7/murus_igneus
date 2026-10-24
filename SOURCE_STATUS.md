@@ -1,3 +1,13 @@
+# Published release — 0.3.0-alpha.6
+
+PR #7 is merged into main. [Download the alpha.6 prerelease](https://github.com/blasterfish7/murus_igneus/releases/tag/v0.3.0-alpha.6): original ISO, DEB, setup guide, checksums and acceptance report.
+Tag target: `bef489b88c7e837e04e597042a9b770f0c45e7bc`; tested build source: `fe201577f6e3b4d8f39f2391935076c826dedcca`. Only QA documentation differs at the release target. [Publisher run 40137816448](https://github.com/blasterfish7/murus_igneus/actions/runs/40137816448) verified original build/ISO/DEB hashes, the 42-check ISO report, all 27 packaged application files and all nine uploaded asset digests before publication.
+
+ISO SHA256: `eb48a856c22ec9eab7127e9e57ea0739bf25e8e6f7d0337a585e1bc9ac63663f`.
+DEB SHA256: `72011485a83e4c4d7e38010e9571d7381b9fcab40d6e81f06913a6c567324bfb`.
+
+Reporting is opt-in: Parental control → Abilita reporting locale → save, preview, apply and confirm. Use stable client IPs and Murus as the gateway. Details and limitations below.
+
 # Alpha.6 acceptance — 2026-10-24 UTC
 
 Tested source: `fe201577f6e3b4d8f39f2391935076c826dedcca`.
@@ -8,7 +18,7 @@ Adds optional local parental reporting (24 hours/7 days, per-IP/subnet forwarded
 ISO: `murus-igneus-0.3.0-alpha.6-devuan-amd64.iso`, 475041792 bytes, SHA256 `eb48a856c22ec9eab7127e9e57ea0739bf25e8e6f7d0337a585e1bc9ac63663f`.
 Original DEB: 98432 bytes, SHA256 `72011485a83e4c4d7e38010e9571d7381b9fcab40d6e81f06913a6c567324bfb`.
 
-The original build is preserved in a private draft after Actions artifact quota rejection. Final publication is pending. Details: [parental setup/reporting](docs/PARENTAL.md), [ISO acceptance and limits](docs/ISO-ALPHA6-QA.md), [structured summary](docs/qa/alpha6-validation.json). DNS requests are not visits/time in apps; bytes are not attributed to sites. No alpha.6 disk installation, physical hardware, Secure Boot or full UTM efficacy claim.
+The original build was preserved in a draft after Actions artifact quota rejection and is now published without rebuilding. The publisher verified all 27 packaged application files against the tested source and all nine release asset digests. Details: [parental setup/reporting](docs/PARENTAL.md), [ISO acceptance and limits](docs/ISO-ALPHA6-QA.md), [structured summary](docs/qa/alpha6-validation.json). DNS requests are not visits/time in apps; bytes are not attributed to sites. No alpha.6 disk installation, physical hardware, Secure Boot or full UTM efficacy claim.
 
 ---
 
