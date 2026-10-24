@@ -1,3 +1,17 @@
+# Alpha.6 acceptance — 2026-10-24 UTC
+
+Tested source: `fe201577f6e3b4d8f39f2391935076c826dedcca`.
+[CI run 40136817311 passed](https://github.com/blasterfish7/murus_igneus/actions/runs/40136817311): 167 Python tests without skips, 10 Chromium checks, 11 native/9 enterprise/17 parental packet checks and four actual HTTPS category feed downloads. The original ISO passes 42 QEMU UEFI/live checks using its installed modules, including actual root HTTPS IPsec/parental apply and rollback.
+
+Adds optional local parental reporting (24 hours/7 days, per-IP/subnet forwarded IPv4 counters, parental drops, DNS request/filter aggregates, CSV and clear) alongside parental profiles, category/service filtering, weekly schedules, immediate pause and DHCP reservations. No Fortinet code/firmware.
+
+ISO: `murus-igneus-0.3.0-alpha.6-devuan-amd64.iso`, 475041792 bytes, SHA256 `eb48a856c22ec9eab7127e9e57ea0739bf25e8e6f7d0337a585e1bc9ac63663f`.
+Original DEB: 98432 bytes, SHA256 `72011485a83e4c4d7e38010e9571d7381b9fcab40d6e81f06913a6c567324bfb`.
+
+The original build is preserved in a private draft after Actions artifact quota rejection. Final publication is pending. Details: [parental setup/reporting](docs/PARENTAL.md), [ISO acceptance and limits](docs/ISO-ALPHA6-QA.md), [structured summary](docs/qa/alpha6-validation.json). DNS requests are not visits/time in apps; bytes are not attributed to sites. No alpha.6 disk installation, physical hardware, Secure Boot or full UTM efficacy claim.
+
+---
+
 # Published release — 0.3.0-alpha.5
 
 PR #6 is merged into main. [Download the alpha.5 prerelease](https://github.com/blasterfish7/murus_igneus/releases/tag/v0.3.0-alpha.5).
@@ -275,6 +289,7 @@ preserved alongside repository licensing. See docs/DEVUAN.md and docs/PROVENANCE
 tools/validate-devuan-runtime.py replaces configuration and creates namespaces:
 run it only in an explicitly flagged disposable live VM, never on a real network.
 It does not erase a disk.
+
 
 
 
