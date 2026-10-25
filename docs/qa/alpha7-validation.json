@@ -1,0 +1,15 @@
+{
+  "version": "0.3.0-alpha.7",
+  "source_sha": "64a4b5dad271bd0ea86e2c19822a5b6974c10105",
+  "run_id": 40207093633,
+  "python_tests": 178,
+  "python_skips": 0,
+  "chromium_checks": 10,
+  "native_packet_checks": 12,
+  "enterprise_packet_checks": 9,
+  "parental_packet_checks": 17,
+  "real_https_category_feeds": 4,
+  "iso_uefi_checks": 44,
+  "iso_sha256": "44c2af50e1a5df6dd4335a36fcee5a58133bfc5c0091bfb2cf556c0bb594115e",
+  "scope": "Disposable namespace packets and QEMU TCG UEFI live ISO. Includes actual invalid nft recovery and appliance HTTPS Basic throttling. No disk installation, physical hardware, Secure Boot or full UTM efficacy claim."
+}
