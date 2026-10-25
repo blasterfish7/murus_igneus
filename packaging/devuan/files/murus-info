@@ -13,6 +13,6 @@ addresses=json.loads(subprocess.check_output(['ip','-j','-4','addr','show','dev'
 for interface in addresses:
     for address in interface.get('addr_info',[]):print('Gestione: https://'+address['local']+':8443')
 print('Utente web: admin | Password iniziale di laboratorio: igneus')
-print('Le credenziali già esistenti vengono conservate. La password root resta quella di Devuan.')
-print('Nessun installer ISO, VPN o UTM operativo è incluso in questa alpha.')
+print('Le credenziali già esistenti vengono conservate. Con la ISO ufficiale la console root usa la password di laboratorio igneus; con il solo pacchetto DEB resta quella di Devuan.')
+print('Alpha sperimentale: cambiare le password prima di collegare la rete a Internet.')
 PYTHON

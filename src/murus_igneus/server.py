@@ -122,6 +122,21 @@ def remove_previous(previous,current,undo):
 def service_settings(plan):
     return plan.get('network_services',{'interfaces':[],**networking.defaults()}) if plan else {'interfaces':[],**networking.defaults()}
 
+FAILED={};FAILED_LOCK=threading.Lock()
+
+def password_blocked(peer):
+    with FAILED_LOCK:
+        now=time.monotonic()
+        for k in [k for k,v in FAILED.items() if all(now-t>=60 for t in v)]:del FAILED[k]
+        return len([t for t in FAILED.get(peer,[]) if now-t<60])>=10
+
+def password_failed(peer,ok):
+    """Count wrong Basic credentials per peer; a request without credentials is only the browser challenge."""
+    with FAILED_LOCK:
+        if ok:FAILED.pop(peer,None);return
+        if len(FAILED)>=1024 and peer not in FAILED:return
+        FAILED.setdefault(peer,[]).append(time.monotonic())
+
 def rollback(ident):
     global PENDING,LAST
     with LOCK:
@@ -139,10 +154,13 @@ def rollback(ident):
             enterprise.activate(ACTIVE.get('enterprise',enterprise.defaults()) if ACTIVE else enterprise.defaults(), ACTIVE.get('configuration',{}).get('interfaces',[]) if ACTIVE else [])
         except Exception as e:service_error=str(e)
         parental.stage(ACTIVE.get('parental') if ACTIVE else None)
-        run(['nft','-f','-'],p['old'])
+        try:run(['nft','-f','-'],p['old'])
+        except Exception as e:service_error=str(e)
         try:parental.activate(ACTIVE.get('parental') if ACTIVE else None,STATE,MGMT)
         except Exception as e:service_error=str(e)
-        if service_error:run(['nft','-f','-'],baseline(MGMT))
+        try:
+            if service_error:run(['nft','-f','-'],baseline(MGMT))
+        except Exception as e:service_error=str(e)
         run(['conntrack','-F'],check=False)
         run(['sysctl','-w','net.ipv4.ip_forward='+p['forward']],check=False)
         PENDING=None;LAST='Modifica annullata; ripristinata la configurazione precedente'
@@ -195,10 +213,15 @@ class Handler(BaseHTTPRequestHandler):
         try:
             h=self.headers.get('Authorization','');actual=base64.b64decode(h[6:],validate=True).decode() if h.startswith('Basic ') else ''
         except Exception:actual=''
+        peer=self.client_address[0]
+        if actual and password_blocked(peer):
+            body=json.dumps({'error':'Troppi tentativi: attendere un minuto'}).encode();self.send_response(429);self.send_header('Retry-After','60');self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body);return False
         if hmac.compare_digest(hashlib.sha256(actual.encode()).digest(),hashlib.sha256(expected.encode()).digest()):
+            password_failed(peer,True)
             if authentication.read(STATE) and not self.mfa_session() and self.path not in ('/', '/app.js', '/management.js', '/network.js', '/enterprise.js', '/parental.js', '/style.css', '/api/auth/status', '/api/auth/verify'):
                 self.reply(403,{'error':'Inserire il codice TOTP', 'mfa_required':True});return False
             return True
+        if actual:password_failed(peer,False)
         self.send_response(401);self.send_header('WWW-Authenticate','Basic realm="Murus Igneus", charset="UTF-8"');self.send_header('Content-Length','0');self.end_headers();return False
     def mfa_session(self):
         from http.cookies import SimpleCookie
