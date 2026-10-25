@@ -162,15 +162,15 @@ jobs:
             dist/packages-devuan.tsv
             dist/signature-status.txt
             dist/clamav-build.log
-            dist/alpha6-iso-networking-qa.json
-            dist/alpha6-iso-console.log
+            dist/alpha7-iso-networking-qa.json
+            dist/alpha7-iso-console.log
           compression-level: 0
-          retention-days: 14
+          retention-days: 2
 
 
 
       - name: Preserve tested ISO in a private draft if Actions storage is full
-        if: success() && steps.upload_iso.outcome == 'failure' && github.ref == 'refs/heads/codex/parental-controls'
+        if: success() && steps.upload_iso.outcome == 'failure' && github.event_name == 'push'
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 tools/stage-candidate-release.py

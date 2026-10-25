@@ -23,11 +23,12 @@ install -m 0644 "$root/src/murus_igneus/LICENSE-MIT" "$stage/usr/share/doc/murus
 install -m 0644 "$root/docs/DEVUAN.md" "$stage/usr/share/doc/murus-igneus/DEVUAN.md"
 install -m 0644 "$root/docs/AI-SWITCHES.md" "$stage/usr/share/doc/murus-igneus/AI-SWITCHES.md"
 install -m 0644 "$root/docs/NATIVE-NETWORKING.md" "$stage/usr/share/doc/murus-igneus/NATIVE-NETWORKING.md"
+install -m 0644 "$root/docs/ALPHA7.md" "$stage/usr/share/doc/murus-igneus/ALPHA7.md"
 install -m 0644 "$root/docs/ALPHA5.md" "$stage/usr/share/doc/murus-igneus/ALPHA5.md"
 install -m 0644 "$root/docs/PARENTAL.md" "$stage/usr/share/doc/murus-igneus/PARENTAL.md"
 cat > "$stage/DEBIAN/control" <<'EOF'
 Package: murus-igneus
-Version: 0.3.0~alpha.6
+Version: 0.3.0~alpha.7
 Section: net
 Priority: optional
 Architecture: all
@@ -72,6 +73,6 @@ if [ "${1:-}" = configure ]; then
 fi
 EOF
 chmod 0755 "$stage/DEBIAN/preinst" "$stage/DEBIAN/prerm" "$stage/DEBIAN/postinst"
-dpkg-deb --root-owner-group --build "$stage" "$output/murus-igneus_0.3.0~alpha.6_all.deb"
+dpkg-deb --root-owner-group --build "$stage" "$output/murus-igneus_0.3.0~alpha.7_all.deb"
 
 
