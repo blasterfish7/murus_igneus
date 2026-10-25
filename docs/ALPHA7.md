@@ -18,6 +18,6 @@ Lo stato pendente viene liberato anche con eccezioni, compresi errori iniziali o
 
 La versione cambia in 0.3.0-alpha.7 per mantenere intatta la alpha.6 pubblicata. La copia di sicurezza dei build collaudati in una release privata in bozza funziona per i push di tutti i rami del repository, incluso quello di Claude, quando la quota artefatti Actions impedisce l'upload. Gli artefatti ISO temporanei hanno conservazione di 2 giorni; release pubblicate invariate.
 
-La pipeline esegue suite Python/Chromium, prove reali di rete e VPN e 17 prove parental/reporting. Nuove prove: transito bloccato dopo un precedente ruleset realmente non valido per nft e limite credenziali attraverso HTTPS sull'appliance. Collaudo ISO atteso: 44 controlli UEFI/live; l'esito effettivo viene registrato separatamente dopo la build. Nessuna nuova certificazione hardware, installazione su disco o efficacia UTM.
+La pipeline esegue suite Python/Chromium, prove reali di rete e VPN e 17 prove parental/reporting. Nuove prove: transito bloccato dopo un precedente ruleset realmente non valido per nft e limite credenziali attraverso HTTPS sull'appliance. La ISO originale ha superato 44 controlli UEFI/live. Esito completo in ISO-ALPHA7-QA.md e negli allegati della release alpha.7. Nessuna nuova certificazione hardware, installazione su disco o efficacia UTM.
 
 Rimangono VPN, UTM, AI opzionale, parental control e reporting della alpha.6. Vedere ALPHA5.md e PARENTAL.md per configurazione e limiti.

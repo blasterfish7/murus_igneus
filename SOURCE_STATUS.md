@@ -1,3 +1,13 @@
+# Published release — 0.3.0-alpha.7
+
+PR #8 is merged into main. [Download the alpha.7 prerelease](https://github.com/blasterfish7/murus_igneus/releases/tag/v0.3.0-alpha.7): original tested ISO, DEB, guide, checksums and acceptance report. Alpha.6 and previous published assets are preserved.
+Tag target: `0d4aee5f8af4d4b0000c2101b09ae2a9df859d2a`; tested build source: `64a4b5dad271bd0ea86e2c19822a5b6974c10105`. Only QA documentation differs at the release target. [Publisher run 40208249111](https://github.com/blasterfish7/murus_igneus/actions/runs/40208249111) verified original build/ISO/DEB hashes, the 44-check ISO report, all 27 application files, installed command/init scripts and all nine uploaded asset digests before publication.
+
+ISO SHA256: `44c2af50e1a5df6dd4335a36fcee5a58133bfc5c0091bfb2cf556c0bb594115e`.
+DEB SHA256: `cf07bbec444c185e71cccf99e87656ed4ff6ab87703b6391c89c3c899419d4b6`.
+
+Setup and limits: [ALPHA7](docs/ALPHA7.md), [parental/reporting](docs/PARENTAL.md), [ISO QA](docs/ISO-ALPHA7-QA.md).
+
 # Alpha.7 acceptance — 2026-10-25 UTC
 
 Tested source: `64a4b5dad271bd0ea86e2c19822a5b6974c10105`.
@@ -8,7 +18,7 @@ Completes Claude PR #8 with bounded/atomic password failure tracking, exceptiona
 ISO: `murus-igneus-0.3.0-alpha.7-devuan-amd64.iso`, 475041792 bytes, SHA256 `44c2af50e1a5df6dd4335a36fcee5a58133bfc5c0091bfb2cf556c0bb594115e`.
 DEB: 100320 bytes, SHA256 `cf07bbec444c185e71cccf99e87656ed4ff6ab87703b6391c89c3c899419d4b6`.
 
-Original artifacts preserved in a private draft; final publication pending. Scope and limitations: [ALPHA7](docs/ALPHA7.md), [ISO acceptance](docs/ISO-ALPHA7-QA.md), [structured summary](docs/qa/alpha7-validation.json). No alpha.7 disk installation, hardware/Secure Boot or complete UTM efficacy claim. No Fortinet code/firmware.
+Original artifacts preserved in a private draft and now published without rebuilding. The publisher verified 27 packaged application files, installed scripts and all nine asset digests. Scope and limitations: [ALPHA7](docs/ALPHA7.md), [ISO acceptance](docs/ISO-ALPHA7-QA.md), [structured summary](docs/qa/alpha7-validation.json). No alpha.7 disk installation, hardware/Secure Boot or complete UTM efficacy claim. No Fortinet code/firmware.
 
 ---
 
