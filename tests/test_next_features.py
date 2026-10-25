@@ -141,12 +141,12 @@ class SignedUpdates(unittest.TestCase):
     def test_real_ed25519_signature_and_tampering(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); package_root = root/'package'; (package_root/'DEBIAN').mkdir(parents=True)
-            (package_root/'DEBIAN/control').write_text('Package: murus-igneus\nVersion: 0.3.0~alpha.6\nArchitecture: all\nMaintainer: Test <test@example.invalid>\nDescription: fixture\n')
+            (package_root/'DEBIAN/control').write_text('Package: murus-igneus\nVersion: 0.3.0~alpha.7\nArchitecture: all\nMaintainer: Test <test@example.invalid>\nDescription: fixture\n')
             subprocess.run(['dpkg-deb','--build',str(package_root),str(root/'murus-igneus.deb')],check=True,capture_output=True)
             private = root/'private.pem';public = root/'public.pem'
             subprocess.run(['openssl','genpkey','-algorithm','ED25519','-out',str(private)],check=True,capture_output=True)
             subprocess.run(['openssl','pkey','-in',str(private),'-pubout','-out',str(public)],check=True,capture_output=True)
-            manifest = {'schema':1,'package':'murus-igneus','version':'0.3.0~alpha.6','sha256':hashlib.sha256((root/'murus-igneus.deb').read_bytes()).hexdigest()}
+            manifest = {'schema':1,'package':'murus-igneus','version':'0.3.0~alpha.7','sha256':hashlib.sha256((root/'murus-igneus.deb').read_bytes()).hexdigest()}
             (root/'manifest.json').write_text(json.dumps(manifest))
             subprocess.run(['openssl','pkeyutl','-sign','-inkey',str(private),'-rawin','-in',str(root/'manifest.json'),'-out',str(root/'manifest.sig')],check=True,capture_output=True)
             self.assertEqual(updates.verify(root,public), manifest)

@@ -1,3 +1,17 @@
+# Alpha.7 acceptance — 2026-10-25 UTC
+
+Tested source: `64a4b5dad271bd0ea86e2c19822a5b6974c10105`.
+[CI run 40207093633 passed](https://github.com/blasterfish7/murus_igneus/actions/runs/40207093633): 178 Python tests without skips, 10 Chromium checks, 12 native/9 enterprise/17 parental packet checks and four real HTTPS category downloads. The original ISO passes 44 UEFI/live checks, including the actual HTTPS Basic throttle, IPsec/parental apply/rollback and a real invalid nft restoration with blocked transit and released pending state.
+
+Completes Claude PR #8 with bounded/atomic password failure tracking, exceptional rollback recovery, truthful GUI/API recovery results, corrected murus-info and branch-independent draft preservation when Actions artifacts cannot be uploaded. Version alpha.7 preserves published alpha.6.
+
+ISO: `murus-igneus-0.3.0-alpha.7-devuan-amd64.iso`, 475041792 bytes, SHA256 `44c2af50e1a5df6dd4335a36fcee5a58133bfc5c0091bfb2cf556c0bb594115e`.
+DEB: 100320 bytes, SHA256 `cf07bbec444c185e71cccf99e87656ed4ff6ab87703b6391c89c3c899419d4b6`.
+
+Original artifacts preserved in a private draft; final publication pending. Scope and limitations: [ALPHA7](docs/ALPHA7.md), [ISO acceptance](docs/ISO-ALPHA7-QA.md), [structured summary](docs/qa/alpha7-validation.json). No alpha.7 disk installation, hardware/Secure Boot or complete UTM efficacy claim. No Fortinet code/firmware.
+
+---
+
 # Published release — 0.3.0-alpha.6
 
 PR #7 is merged into main. [Download the alpha.6 prerelease](https://github.com/blasterfish7/murus_igneus/releases/tag/v0.3.0-alpha.6): original ISO, DEB, setup guide, checksums and acceptance report.

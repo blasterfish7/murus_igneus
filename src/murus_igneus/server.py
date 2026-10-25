@@ -122,31 +122,75 @@ def remove_previous(previous,current,undo):
 def service_settings(plan):
     return plan.get('network_services',{'interfaces':[],**networking.defaults()}) if plan else {'interfaces':[],**networking.defaults()}
 
+FAILED={};FAILED_LOCK=threading.Lock()
+PASSWORD_WINDOW=60;PASSWORD_LIMIT=10;PASSWORD_PEERS=1024
+
+def _password_prune(now):
+    # Caller holds FAILED_LOCK. Both the peer table and each sliding window are bounded.
+    for peer,values in list(FAILED.items()):
+        recent=[t for t in values if now-t<PASSWORD_WINDOW][-PASSWORD_LIMIT:]
+        if recent:FAILED[peer]=recent
+        else:del FAILED[peer]
+
+def _password_blocked(peer):
+    return len(FAILED.get(peer,[]))>=PASSWORD_LIMIT or (peer not in FAILED and len(FAILED)>=PASSWORD_PEERS)
+
+def _password_record(peer,ok,now):
+    if ok:FAILED.pop(peer,None)
+    elif peer in FAILED or len(FAILED)<PASSWORD_PEERS:
+        FAILED[peer]=(FAILED.get(peer,[])+[now])[-PASSWORD_LIMIT:]
+
+def password_blocked(peer):
+    with FAILED_LOCK:
+        _password_prune(time.monotonic())
+        return _password_blocked(peer)
+
+def password_failed(peer,ok):
+    with FAILED_LOCK:
+        now=time.monotonic();_password_prune(now);_password_record(peer,ok,now)
+
+def password_attempt(peer,ok):
+    """Atomically admit and record a supplied credential; missing headers are browser challenges."""
+    with FAILED_LOCK:
+        now=time.monotonic();_password_prune(now)
+        if _password_blocked(peer):return False
+        _password_record(peer,ok,now)
+        return True
+
 def rollback(ident):
     global PENDING,LAST
     with LOCK:
         if not PENDING or PENDING['id']!=ident:return
-        p=PENDING
-        run(['nft','-f','-'],baseline(MGMT))
-        parental.stop()
-        enterprise.stop()
-        networking.stop()
-        for args in reversed(p['undo']):run(args,check=False)
-        service_error=None
+        p=PENDING;errors=[]
+        def attempt(label,fn,*args,**kwargs):
+            try:fn(*args,**kwargs);return True
+            except Exception as exc:
+                errors.append(label+': '+str(exc)[:300]);return False
         try:
-            security.activate(p['security'])
-            networking.activate(service_settings(ACTIVE),MGMT)
-            enterprise.activate(ACTIVE.get('enterprise',enterprise.defaults()) if ACTIVE else enterprise.defaults(), ACTIVE.get('configuration',{}).get('interfaces',[]) if ACTIVE else [])
-        except Exception as e:service_error=str(e)
-        parental.stage(ACTIVE.get('parental') if ACTIVE else None)
-        run(['nft','-f','-'],p['old'])
-        try:parental.activate(ACTIVE.get('parental') if ACTIVE else None,STATE,MGMT)
-        except Exception as e:service_error=str(e)
-        if service_error:run(['nft','-f','-'],baseline(MGMT))
-        run(['conntrack','-F'],check=False)
-        run(['sysctl','-w','net.ipv4.ip_forward='+p['forward']],check=False)
-        PENDING=None;LAST='Modifica annullata; ripristinata la configurazione precedente'
-        if service_error:LAST='Ripristino servizi fallito: '+service_error
+            # Do not change interfaces/services unless transit has first been closed.
+            if attempt('Regole di sicurezza iniziali',run,['nft','-f','-'],baseline(MGMT)):
+                attempt('Arresto parental',parental.stop)
+                attempt('Arresto VPN/WAN',enterprise.stop)
+                attempt('Arresto DNS/DHCP',networking.stop)
+                for args in reversed(p['undo']):attempt('Ripristino rete',run,args)
+                attempt('Ripristino UTM/VPN',security.activate,p['security'])
+                attempt('Ripristino DNS/DHCP',networking.activate,service_settings(ACTIVE),MGMT)
+                attempt('Ripristino VPN/WAN',enterprise.activate,ACTIVE.get('enterprise',enterprise.defaults()) if ACTIVE else enterprise.defaults(),ACTIVE.get('configuration',{}).get('interfaces',[]) if ACTIVE else [])
+                attempt('Preparazione parental',parental.stage,ACTIVE.get('parental') if ACTIVE else None)
+                if not errors and attempt('Regole precedenti',run,['nft','-f','-'],p['old']):
+                    attempt('Ripristino parental',parental.activate,ACTIVE.get('parental') if ACTIVE else None,STATE,MGMT)
+            attempt('Pulizia conntrack',run,['conntrack','-F'])
+            attempt('Ripristino forwarding',run,['sysctl','-w','net.ipv4.ip_forward='+p['forward']])
+        except Exception as exc:
+            errors.append('Ripristino: '+str(exc)[:300])
+        finally:
+            # Any incomplete recovery keeps a management-only firewall, where nft is available.
+            if errors:attempt('Fallback regole di sicurezza',lambda:run(['nft','-f','-'],baseline(MGMT)))
+            PENDING=None
+            detail=errors if len(errors)<=8 else errors[:7]+errors[-1:]
+            LAST='Ripristino servizi fallito: '+'; '.join(detail) if errors else 'Modifica annullata; ripristinata la configurazione precedente'
+            if len(errors)>8:LAST+='; ulteriori errori: '+str(len(errors)-8)
+        return {'ok':not errors,'error':LAST if errors else None}
 
 def apply(plan):
     global PENDING,LAST
@@ -195,7 +239,11 @@ class Handler(BaseHTTPRequestHandler):
         try:
             h=self.headers.get('Authorization','');actual=base64.b64decode(h[6:],validate=True).decode() if h.startswith('Basic ') else ''
         except Exception:actual=''
-        if hmac.compare_digest(hashlib.sha256(actual.encode()).digest(),hashlib.sha256(expected.encode()).digest()):
+        peer=self.client_address[0]
+        correct=hmac.compare_digest(hashlib.sha256(actual.encode()).digest(),hashlib.sha256(expected.encode()).digest())
+        if h and not password_attempt(peer,correct):
+            body=json.dumps({'error':'Troppi tentativi: attendere un minuto'}).encode();self.send_response(429);self.send_header('Retry-After','60');self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body);return False
+        if correct:
             if authentication.read(STATE) and not self.mfa_session() and self.path not in ('/', '/app.js', '/management.js', '/network.js', '/enterprise.js', '/parental.js', '/style.css', '/api/auth/status', '/api/auth/verify'):
                 self.reply(403,{'error':'Inserire il codice TOTP', 'mfa_required':True});return False
             return True
@@ -314,8 +362,8 @@ class Handler(BaseHTTPRequestHandler):
                     if not PENDING or data.get('id')!=PENDING['id'] or time.time()>=PENDING['deadline']:raise Error('Conferma scaduta o non valida')
                     atomic(STATE/'active.json',json.dumps(PENDING['plan']));ACTIVE=PENDING['plan'];PENDING=None;LAST='Configurazione confermata e salvata';self.reply(200,{'ok':True})
                 elif self.path=='/api/rollback':
-                    if PENDING:rollback(PENDING['id'])
-                    self.reply(200,{'ok':True})
+                    result=rollback(PENDING['id']) if PENDING else {'ok':True}
+                    self.reply(200,result)
                 else:self.reply(404,{'error':'Risorsa assente'})
         except (ValueError,KeyError,TypeError,RecursionError,subprocess.TimeoutExpired) as e:self.reply(400,{'error':str(e)})
 

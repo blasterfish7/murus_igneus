@@ -2,6 +2,8 @@
 import hashlib
 import json
 import os
+import re
+import sys
 from pathlib import Path
 import urllib.parse
 import urllib.request
@@ -11,7 +13,12 @@ REPO = os.environ['GITHUB_REPOSITORY']
 assert REPO == 'blasterfish7/murus_igneus'
 SHA = os.environ['GITHUB_SHA']; RUN = os.environ['GITHUB_RUN_ID']
 assert len(SHA) == 40 and all(c in '0123456789abcdef' for c in SHA) and RUN.isdigit()
-assert os.environ['GITHUB_REF'] == 'refs/heads/codex/parental-controls'
+assert os.environ['GITHUB_EVENT_NAME'] == 'push' and os.environ['GITHUB_REF'].startswith('refs/heads/')
+sys.path.insert(0,str(ROOT/'src/murus_igneus'))
+from migration import VERSION
+assert re.fullmatch(r'0\.3\.0-alpha\.[0-9]+',VERSION)
+LABEL=VERSION.removeprefix('0.3.0-').replace('.','')
+ISO_CHECKS=44
 API = 'https://api.github.com/repos/' + REPO
 
 
@@ -26,27 +33,27 @@ def request(url, data=None, method='GET', content_type='application/json'):
 
 
 out = ROOT / 'dist'
-qa = json.loads((out / 'alpha6-iso-networking-qa.json').read_text())
-assert qa['success'] and len(qa['checks']) == 42, qa
-iso = out / 'murus-igneus-0.3.0-alpha.6-devuan-amd64.iso'
+qa = json.loads((out / (LABEL+'-iso-networking-qa.json')).read_text())
+assert qa['success'] and len(qa['checks']) == ISO_CHECKS, qa
+iso = out / ('murus-igneus-'+VERSION+'-devuan-amd64.iso')
 with iso.open('rb') as f:
     digest = hashlib.file_digest(f, 'sha256').hexdigest()
 assert qa['iso'] == iso.name and qa['sha256'] == digest
 assert (out / 'SHA256SUMS').read_text().strip() == digest + '  ' + iso.name
-files = [iso, out / 'murus-igneus_0.3.0~alpha.6_all.deb', out / 'alpha6-iso-networking-qa.json',
+files = [iso, out / ('murus-igneus_'+VERSION.replace('-','~',1)+'_all.deb'), out / (LABEL+'-iso-networking-qa.json'),
          out / 'SHA256SUMS', out / 'packages-devuan.tsv', out / 'signature-status.txt']
-manifest = {'source_sha': SHA, 'run_id': RUN, 'iso_checks': 42, 'files': {}}
+manifest = {'source_sha': SHA, 'run_id': RUN, 'iso_checks': ISO_CHECKS, 'files': {}}
 for file in files:
     assert file.is_file() and file.stat().st_size > 0
     with file.open('rb') as f:
         manifest['files'][file.name.replace('~', '-')] = {'size': file.stat().st_size, 'sha256': hashlib.file_digest(f, 'sha256').hexdigest()}
 manifest_path = out / 'candidate-validation.json'; manifest_path.write_text(json.dumps(manifest, indent=2) + '\n'); files.append(manifest_path)
-tag = 'candidate-alpha6-' + SHA[:12] + '-' + RUN
+tag = 'candidate-'+LABEL+'-' + SHA[:12] + '-' + RUN
 existing = request(API + '/releases?per_page=100')
 release = next((r for r in existing if r['tag_name'] == tag), None)
 if release is None:
-    body = {'tag_name': tag, 'target_commitish': SHA, 'name': 'Validated alpha.6 candidate ' + SHA[:12],
-            'draft': True, 'prerelease': True, 'body': 'Private draft preserving the original tested build while Actions artifact storage is full. Source: ' + SHA + '. CI run: ' + RUN + '. ISO: 42 UEFI/live and packet checks. Not a published release.'}
+    body = {'tag_name': tag, 'target_commitish': SHA, 'name': 'Validated '+VERSION+' candidate ' + SHA[:12],
+            'draft': True, 'prerelease': True, 'body': 'Private draft preserving the original tested build while Actions artifact storage is full. Source: ' + SHA + '. CI run: ' + RUN + '. ISO: '+str(ISO_CHECKS)+' UEFI/live and packet checks. Not a published release.'}
     release = request(API + '/releases', json.dumps(body).encode(), 'POST')
 assert release['draft'] and release['target_commitish'] == SHA
 for file in files:
