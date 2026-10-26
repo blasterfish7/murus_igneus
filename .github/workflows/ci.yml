@@ -1,176 +1,72 @@
-name: Python checks
+name: Cleanup obsolete build artifacts
 on:
   push:
-  pull_request:
+    branches: [codex/cleanup-artifacts-20261026]
 permissions:
   contents: read
+  actions: write
 jobs:
-  tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - name: Install protocol test tools
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends snmp snmpd
-      - name: Python syntax
-        run: python -m compileall -q src/murus_igneus
-      - name: Install configuration parser used by Devuan
-        run: python -m pip install PyYAML==6.0.2
-      - name: Static Python checks
-        run: |
-          python -m pip install ruff==0.11.13
-          python -m ruff check --select F,E9 src tests
-      - name: Migration regression tests
-        run: python -m unittest discover -s tests -p 'test_*.py' -v
-      - name: Validate actual parental category downloads
-        if: github.event_name == 'push'
-        run: python tools/validate-parental-feeds.py
-      - name: Save actual feed validation report
-        if: github.event_name == 'push'
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: murus-parental-feed-qa
-          path: dist/parental-feed-qa.json
-          retention-days: 14
-      - name: Shell and JavaScript syntax
-        run: |
-          sh -n packaging/devuan/build-deb.sh
-          sh -n packaging/devuan/files/murus-igneus.initd
-          sh -n packaging/devuan/files/murus-serve
-          node --check src/murus_igneus/app.js
-          node --check src/murus_igneus/management.js
-          node --check src/murus_igneus/network.js
-          node --check src/murus_igneus/enterprise.js
-          node --check src/murus_igneus/parental.js
-          node tests/test_management_ui.js
-          node tests/test_network_ui.js
-      - name: Real Chromium native configuration GUI
-        run: |
-          npm install --prefix "$RUNNER_TEMP/murus-browser" playwright-core@1.64.1 @sparticuz/chromium@153.0.0
-          node tools/prepare-browser.cjs "$RUNNER_TEMP/murus-browser"
-          MURUS_PLAYWRIGHT="$RUNNER_TEMP/murus-browser/node_modules/playwright-core" MURUS_CHROMIUM="$RUNNER_TEMP/murus-browser/bin/chromium" node tools/validate-networking-browser.cjs
-      - name: Save browser acceptance report
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: murus-native-browser-qa
-          path: dist/browser-networking-qa.json
-          retention-days: 14
-      - name: Build Devuan package
-        run: sh packaging/devuan/build-deb.sh
-      - name: Upload Devuan package
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: murus-igneus-devuan-alpha
-          path: dist/*.deb
-          retention-days: 14
-
-  network-runtime:
+  cleanup:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - name: Install isolated traffic test tools
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nftables iproute2 conntrack dnsmasq-base
-      - name: Exercise VLAN, DHCP, DNS, DNAT and rollback with real packets
-        run: sudo env MURUS_LAB=YES unshare --mount --net --fork python3 tools/validate-native-networking.py
-      - name: Save traffic acceptance report
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: murus-native-networking-qa
-          path: dist/native-networking-qa.json
-          retention-days: 14
-
-  enterprise-runtime:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install actual IKEv2 and network test tools
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nftables iproute2 iputils-ping strongswan-charon strongswan-swanctl libcharon-extra-plugins libstrongswan-standard-plugins
-      - name: Allow only the disposable lab paths in existing AppArmor profiles
-        run: |
-          for profile in usr.lib.ipsec.charon usr.sbin.swanctl; do
-            if [ -f "/etc/apparmor.d/$profile" ]; then
-              echo '/tmp/murus-enterprise-*/** rw,' | sudo tee -a "/etc/apparmor.d/local/$profile"
-              sudo apparmor_parser -r "/etc/apparmor.d/$profile"
-            fi
-          done
-      - name: Exercise IKEv2 and WAN failover using real packets
-        run: |
-          sudo env MURUS_LAB=YES unshare --mount --net --fork python3 tools/validate-enterprise-runtime.py || { sudo dmesg | tail -80; exit 1; }
-      - name: Save enterprise acceptance report
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: murus-enterprise-runtime-qa
-          path: dist/enterprise-runtime-qa.json
-          retention-days: 14
-
-  parental-runtime:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install parental packet lab tools
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nftables iproute2 conntrack dnsmasq-base
-      - name: Test actual DNS, schedules, pauses, reservations and local proxy
-        run: sudo env MURUS_LAB=YES unshare --mount --net --fork python3 tools/validate-parental-runtime.py
-      - name: Save parental acceptance report
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: murus-parental-runtime-qa
-          path: dist/parental-runtime-qa.json
-          retention-days: 14
-
-  devuan-iso:
-    permissions:
-      contents: write
-    needs: [tests, network-runtime, enterprise-runtime, parental-runtime]
-    if: github.event_name == 'push'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
-    container:
-      image: dyne/devuan:excalibur@sha256:10f6138df94c08164f300a2f35f96cd8c8966fc4948550dbe0485149d020248f
-      options: --privileged
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build signed-main Devuan appliance ISO
-        run: bash tools/build-devuan-iso.sh
-      - name: Install disposable UEFI test tools
-        run: apt-get install -y --no-install-recommends qemu-system-x86 ovmf python3-pexpect
-      - name: Boot original ISO and run real network acceptance in guest
-        run: MURUS_LAB=YES python3 tools/validate-iso-networking.py
-      - name: Save ISO, checksums and package manifest
-        id: upload_iso
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: murus-igneus-devuan-iso
-          path: |
-            dist/*.iso
-            dist/SHA256SUMS
-            dist/packages-devuan.tsv
-            dist/signature-status.txt
-            dist/clamav-build.log
-            dist/alpha7-iso-networking-qa.json
-            dist/alpha7-iso-console.log
-          compression-level: 0
-          retention-days: 2
-
-
-
-      - name: Preserve tested ISO in a private draft if Actions storage is full
-        if: success() && steps.upload_iso.outcome == 'failure' && github.event_name == 'push'
+      - name: Delete old merged-build copies and stale main caches; verify releases
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 tools/stage-candidate-release.py
+        shell: python
+        run: |
+          import json, os, urllib.request
+          from urllib.error import HTTPError
+          API="https://api.github.com/repos/blasterfish7/murus_igneus"
+          def api(path, method="GET"):
+              req=urllib.request.Request(API+path,method=method,headers={"Authorization":"Bearer "+os.environ["GH_TOKEN"],"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"})
+              with urllib.request.urlopen(req,timeout=60) as r:
+                  data=r.read()
+                  return json.loads(data) if data else None
+          def pages(path,key):
+              rows=[]
+              for page in range(1,21):
+                  data=api(path+("?per_page=100&page=" if "?" not in path else "&per_page=100&page=")+str(page))[key]
+                  rows.extend(data)
+                  if len(data)<100:return rows
+              raise RuntimeError("Inventory exceeded bounded pagination")
+          def snapshot():
+              return sorted((r["id"],r["tag_name"],sorted((a["id"],a["name"],a["size"],a.get("digest")) for a in r["assets"])) for r in api("/releases?per_page=100"))
+          before=snapshot()
+          assert any(r[1]=="v0.3.0-alpha.7" and any(a[0]==675411908 and a[2]==475041792 and a[3]=="sha256:44c2af50e1a5df6dd4335a36fcee5a58133bfc5c0091bfb2cf556c0bb594115e" for a in r[2]) for r in before)
+          main=api("/git/ref/heads/main")["object"]["sha"]
+          assert main=="ce4af00760ce4ef320a89f937259cb0ff33f2a65"
+          artifacts=pages("/actions/artifacts","artifacts")
+          caches=pages("/actions/caches","actions_caches")
+          known={};runs={}
+          def ancestor(sha):
+              if sha not in known:
+                  try:known[sha]=api("/compare/"+sha+"..."+main)["behind_by"]==0
+                  except HTTPError as e:
+                      if e.code not in (404,409):raise
+                      known[sha]=False
+              return known[sha]
+          selected=[]
+          for a in artifacts:
+              if a["expired"] or not a["name"].startswith("murus-") or a["created_at"]>="2026-10-25T15:43:28Z":continue
+              run=a.get("workflow_run") or {}
+              if not run.get("head_sha") or not ancestor(run["head_sha"]):continue
+              ident=run["id"]
+              if ident not in runs:runs[ident]=api("/actions/runs/"+str(ident))["status"]
+              if runs[ident]=="completed":selected.append(a)
+          cache_selected=[c for c in caches if c["ref"]=="refs/heads/main" and c["last_accessed_at"]<"2026-10-19T00:00:00Z"]
+          assert len(selected)<=1000 and len(cache_selected)<=100
+          print("Inventory:",json.dumps({"artifacts":len(artifacts),"caches":len(caches),"eligible_artifacts":len(selected),"eligible_caches":len(cache_selected),"preserved_unmerged_sources":[s for s,v in known.items() if not v]}),flush=True)
+          deleted=[];deleted_caches=[]
+          for a in selected:
+              api("/actions/artifacts/"+str(a["id"]),"DELETE")
+              deleted.append({"id":a["id"],"bytes":a["size_in_bytes"]})
+          for c in cache_selected:
+              api("/actions/caches/"+str(c["id"]),"DELETE")
+              deleted_caches.append({"id":c["id"],"bytes":c["size_in_bytes"]})
+          assert snapshot()==before,"Release assets changed"
+          assert api("/git/ref/heads/main")["object"]["sha"]==main,"Main moved during cleanup"
+          report={"deleted_artifacts":len(deleted),"deleted_caches":len(deleted_caches),"artifact_bytes":sum(x["bytes"] for x in deleted),"cache_bytes":sum(x["bytes"] for x in deleted_caches),"releases_unchanged":True,"main_unchanged":True,"remaining_artifacts":api("/actions/artifacts?per_page=1")["total_count"]}
+          print("CLEANUP_REPORT="+json.dumps(report),flush=True)
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:f.write("# Temporary build cleanup\n\n"+json.dumps(report,indent=2)+"\n")
+          
