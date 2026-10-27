@@ -146,18 +146,28 @@ ThreadingHTTPServer(('0.0.0.0',8080),HTTP).serve_forever()
         run(['ip','-6','addr','add','fd60::1/64','dev','lan0','nodad']);run(['ip','-6','addr','add','fd61::1/64','dev','wan0','nodad'])
         ns('pc-kid',['ip','-6','addr','add','fd60::10/64','dev','eth0','nodad']);ns('pc-up',['ip','-6','addr','add','fd61::2/64','dev','eth0','nodad'])
         ns('pc-kid',['ip','-6','route','add','default','via','fd60::1']);ns('pc-up',['ip','-6','route','add','default','via','fd61::1'])
+        # Static lab neighbors isolate routed filtering from NDP, which the whole-LAN guard intentionally drops.
+        lan_mac=json.loads(run(['ip','-j','link','show','dev','lan0']))[0]['address']
+        wan_mac=json.loads(run(['ip','-j','link','show','dev','wan0']))[0]['address']
+        up_mac=json.loads(ns('pc-up',['ip','-j','link','show','dev','eth0']))[0]['address']
+        run(['ip','-6','neigh','replace','fd60::10','lladdr','02:00:00:00:00:01','dev','lan0','nud','permanent'])
+        run(['ip','-6','neigh','replace','fd61::2','lladdr',up_mac,'dev','wan0','nud','permanent'])
+        ns('pc-kid',['ip','-6','neigh','replace','fd60::1','lladdr',lan_mac,'dev','eth0','nud','permanent'])
+        ns('pc-up',['ip','-6','neigh','replace','fd61::1','lladdr',wan_mac,'dev','eth0','nud','permanent'])
         v6fixture="import socket;s=socket.socket(socket.AF_INET6,socket.SOCK_STREAM);s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1);s.bind(('fd61::2',8082));s.listen()\nwhile True:\n c,a=s.accept();c.sendall(b'ipv6');c.close()"
         processes.append(subprocess.Popen(['ip','netns','exec','pc-up','python3','-c',v6fixture],stderr=sys.stderr));time.sleep(.2)
         run(['nft','insert','rule','inet','murus_igneus','forward','meta','nfproto','ipv6','accept'])
         run(['nft','insert','rule','inet','murus_igneus','input','meta','nfproto','ipv6','accept'])
         v6client="import socket;s=socket.socket(socket.AF_INET6,socket.SOCK_STREAM);s.settimeout(3)\ntry:s.connect(('fd61::2',8082));print(s.recv(16).decode())\nexcept OSError:print('BLOCKED')"
         assert ns('pc-kid',['python3','-c',v6client])=='BLOCKED'
+        removed=0
         for chain in ['pc_forward','pc_input','pc_output']:
             handles=json.loads(run(['nft','-j','-a','list','chain','inet','murus_igneus',chain]))
             for entry in handles['nftables']:
                 rule=entry.get('rule',{})
-                if any(e.get('match',{}).get('right')=='ipv6' for e in rule.get('expr',[])):
-                    run(['nft','delete','rule','inet','murus_igneus',chain,'handle',str(rule['handle'])])
+                if rule.get('comment')=='parental IPv6 LAN':
+                    run(['nft','delete','rule','inet','murus_igneus',chain,'handle',str(rule['handle'])]);removed+=1
+        assert removed==4,removed
         positive=ns('pc-kid',['python3','-c',v6client]);assert positive=='ipv6',(positive,run(['ip','-6','neigh']),ns('pc-kid',['ip','-6','neigh']))
         ok('Opt-in IPv6 guard blocks actual routed packets on the whole protected LAN before a permissive forwarding rule')
 

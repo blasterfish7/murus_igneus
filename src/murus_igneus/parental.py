@@ -221,7 +221,7 @@ def decorate(plan, settings, interfaces):
     lines += reporting.rules(settings, interfaces)
     for device in sorted({ports[p['interface']]['device'] for p in profiles if p.get('block_ipv6')}):
         for chain, direction in [('pc_forward', 'iifname'), ('pc_forward', 'oifname'), ('pc_input', 'iifname'), ('pc_output', 'oifname')]:
-            lines.append(f'insert rule inet murus_igneus {chain} {direction} {json.dumps(device)} meta nfproto ipv6 counter drop')
+            lines.append(f'insert rule inet murus_igneus {chain} {direction} {json.dumps(device)} meta nfproto ipv6 counter drop comment "parental IPv6 LAN"')
     plan['warnings'].append('Parental IPv6: nessun filtro per dispositivo. Il blocco IPv6 opzionale copre tutta la LAN scelta, incluso accesso al firewall; non copre percorsi alternativi sullo stesso segmento.')
     for row in profiles:
         dev = json.dumps(ports[row['interface']]['device']); clients = '{ ' + ', '.join(row['clients']) + ' }'; port = 12000 + row['id']
