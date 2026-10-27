@@ -25,17 +25,17 @@
     <h4>Andamento orario · IPv4 inoltrato</h4><div id="parental-report-hourly"></div>
     <h4>Domini DNS più richiesti · massimo 100 nel periodo</h4><div id="parental-report-domains"></div>`;
   document.querySelector('main').append(page);
-  let profiles=[],taskId=null,reportData=null;
+  let profiles=[],taskId=null,reportData=null;const expanded=new Set();
   const values=input=>input.value.split(/[\n,]+/).map(v=>v.trim()).filter(Boolean);
   function field(card,label,value,type='text') {const wrap=document.createElement('label');wrap.textContent=label;const input=document.createElement(type==='textarea'?'textarea':'input');if(type!=='textarea')input.type=type;input.value=value??'';wrap.append(input);card.append(wrap);return input;}
-  function checkbox(card,label,checked,change){const input=field(card,label,'','checkbox');input.checked=checked;input.onchange=()=>change(input.checked);return input;}
+  function checkbox(card,label,checked,change){const input=field(card,label,'','checkbox');input.closest('label').classList.add(label.length<45?'compact-check':'wide-check');input.checked=checked;input.onchange=()=>change(input.checked);return input;}
   function render() {
     el('parental-profiles').replaceChildren();
     for(const row of profiles){
       const card=document.createElement('article');card.className='switch-card';card.append(text('h3',`${row.name || 'Figlio'} · Profilo ${row.id}`));
       Object.assign(row,{devices:row.devices||[],safe_search:row.safe_search||false,youtube_restricted:row.youtube_restricted||'off',study_windows:row.study_windows||[],study_domains:row.study_domains||[],night_windows:row.night_windows||[],block_ipv6:row.block_ipv6||false});
-      const name=field(card,'Nome profilo',row.name);name.required=true;name.maxLength=80;name.oninput=()=>{row.name=name.value;};
-      checkbox(card,'Profilo abilitato',row.enabled,v=>{row.enabled=v;});
+      const name=field(card,'Nome profilo',row.name);name.required=true;name.maxLength=80;name.oninput=()=>{row.name=name.value;const title=card.closest('.profile-panel')?.querySelector('.profile-name');if(title)title.textContent=row.name||'Nuovo profilo';};
+      checkbox(card,'Profilo abilitato',row.enabled,v=>{row.enabled=v;const meta=card.closest('.profile-panel')?.querySelector('.profile-meta');if(meta)meta.textContent=`${row.clients.length} indirizzi / subnet · ${v?'Abilitato nella bozza':'Disabilitato'}`;});
       const label=document.createElement('label');label.textContent='LAN protetta';const port=document.createElement('select');
       for(const entry of config.interfaces.filter(r=>r.address))port.append(new Option(entry.name,entry.name));
       port.value=row.interface;port.required=true;port.onchange=()=>{row.interface=port.value;};label.append(port);card.append(label);
@@ -75,12 +75,12 @@
       card.append(button('Imposta compiti 16:00–18:00 lunedì–venerdì',()=>{row.study_windows=[{days:[0,1,2,3,4],start:'16:00',end:'18:00'}];render();}));
       windowEditor(card,row,'study_windows');
       card.append(button('Rimuovi profilo',()=>{profiles=profiles.filter(p=>p!==row);render();}));
-      el('parental-profiles').append(card);
+      const panel=document.createElement('details');panel.className='profile-panel';panel.open=expanded.has(row.id)||profiles.length===1;const summary=document.createElement('summary');summary.append(text('strong',row.name||'Nuovo profilo','profile-name'),text('span',`${row.clients.length} indirizzi / subnet · ${row.enabled?'Abilitato nella bozza':'Disabilitato'}`,'profile-meta'));panel.append(summary,card);panel.ontoggle=()=>{if(panel.open)expanded.add(row.id);else expanded.delete(row.id);};el('parental-profiles').append(panel);
     }
   }
   function windowEditor(card,row,key){
     for(const window of row[key]){
-      const box=document.createElement('div');box.className='feature-grid';
+      const box=document.createElement('div');box.className='feature-grid schedule-window';
       for(const [index,title] of ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'].entries())checkbox(box,title,window.days.includes(index),v=>{window.days=v?[...window.days,index]:window.days.filter(d=>d!==index);});
       const start=field(box,'Dalle',window.start,'time');start.required=true;start.oninput=()=>{window.start=start.value;};
       const end=field(box,'Alle',window.end,'time');end.required=true;end.oninput=()=>{window.end=end.value;};
@@ -105,8 +105,9 @@
     if(data.task?.state==='running')taskId=data.task.id;
     else if(taskId&&data.task?.id===taskId){el('parental-feed-state').textContent=data.task.state==='failed'?data.task.error:data.task.result.message;taskId=null;}
   }
-  el('nav').append(button('Parental control',async()=>{try{const settings=config.parental||{enabled:false,timezone:'Europe/Rome',upstream_servers:['1.1.1.1','9.9.9.9'],profiles:[]};profiles=structuredClone(settings.profiles);el('parental-enabled').checked=settings.enabled;el('parental-reporting').checked=!!settings.reporting;el('parental-auto-update').checked=!!settings.auto_update;el('parental-timezone').value=settings.timezone;el('parental-upstreams').value=settings.upstream_servers.join(', ');render();show('parental-page');await refresh();await refreshReport();}catch(exc){error(exc);}}));
-  el('parental-add').onclick=()=>{if(profiles.length>=8)return error('Massimo 8 profili');profiles.push({id:Array.from({length:8},(_,i)=>i+1).find(id=>!profiles.some(p=>p.id===id)),name:'Nuovo profilo',enabled:true,interface:config.interfaces.find(r=>r.address)?.name||'',clients:[],categories:[],services:[],blocked_domains:[],allowed_domains:[],windows:[],paused:false,enforce_dns:true,block_quic:false});render();};
+  el('nav').append(button('Parental control',async()=>{try{const settings=config.parental||{enabled:false,timezone:'Europe/Rome',upstream_servers:['1.1.1.1','9.9.9.9'],profiles:[]};profiles=structuredClone(settings.profiles);if(!expanded.size&&profiles.length)expanded.add(profiles[0].id);el('parental-enabled').checked=settings.enabled;el('parental-reporting').checked=!!settings.reporting;el('parental-auto-update').checked=!!settings.auto_update;el('parental-timezone').value=settings.timezone;el('parental-upstreams').value=settings.upstream_servers.join(', ');render();show('parental-page');await refresh();await refreshReport();}catch(exc){error(exc);}}));
+  el('parental-add').onclick=()=>{if(profiles.length>=8)return error('Massimo 8 profili');profiles.push({id:Array.from({length:8},(_,i)=>i+1).find(id=>!profiles.some(p=>p.id===id)),name:'Nuovo profilo',enabled:true,interface:config.interfaces.find(r=>r.address)?.name||'',clients:[],categories:[],services:[],blocked_domains:[],allowed_domains:[],windows:[],paused:false,enforce_dns:true,block_quic:false});expanded.add(profiles.at(-1).id);render();};
+  el('parental-form').addEventListener('invalid',event=>{const panel=event.target.closest('.profile-panel');if(panel)panel.open=true;},true);
   el('parental-form').onsubmit=event=>{event.preventDefault();if(pending)return error('Conferma o annulla prima la modifica pendente');config.parental={enabled:el('parental-enabled').checked,reporting:el('parental-reporting').checked,auto_update:el('parental-auto-update').checked,timezone:el('parental-timezone').value.trim(),upstream_servers:values(el('parental-upstreams')),profiles:structuredClone(profiles)};invalidate();show('review-page');};
   const bytes=value=>{const units=['B','KiB','MiB','GiB','TiB'];let i=0;while(value>=1024&&i<units.length-1){value/=1024;i++;}return `${value.toFixed(i?1:0)} ${units[i]}`;};
   function reportTable(target,headers,rows){

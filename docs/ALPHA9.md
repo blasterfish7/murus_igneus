@@ -13,6 +13,10 @@ Base Devuan 6 Excalibur/OpenRC. Implementazione indipendente con componenti open
 - Blocco IPv6 opzionale su TUTTA la LAN del profilo, anche dispositivi non assegnati e accesso IPv6 al firewall. Serve a escludere il transito IPv6 attraverso Murus: non è parental IPv6 per dispositivo. Non copre router alternativi o traffico diretto tra host della stessa LAN.
 - Riepilogo traffico per figlio/profilo e selettore dedicato, mantenendo dettaglio per IPv4 e raccolta locale facoltativa di 7 giorni. Nessun invio dei report al cloud.
 
+## Interfaccia di amministrazione
+
+Grafica originale con menu laterale suddiviso per rete, sicurezza, famiglia e sistema; ricerca delle funzioni, dashboard con valori della bozza, schede dei figli richiudibili e moduli e tabelle uniformi. Tema chiaro/scuro memorizzato soltanto nel browser e menu adattato agli schermi piccoli. I pulsanti di configurazione, installazione e importazione sono in evidenza nella home. Le modifiche restano soggette alla verifica e alla conferma esistenti. Nessuna dipendenza da servizi grafici esterni.
+
 ## Installazione e uso
 
 La live è un appliance senza desktop: il browser si apre da un altro PC sulla rete di gestione. La console mostra ora indirizzo e porta HTTPS prima e dopo il login; `murus-info` riepiloga gli URL reali. L’installazione è raggiungibile dal pulsante «Installa su disco» in home. È disponibile anche `murus-install` da console root: elenca i dischi non montati di almeno 8 GiB e richiede la frase esatta `CANCELLA /dev/...` prima di modificare il disco. Nessuna conferma automatica. Console e web condividono un blocco di installazione per impedire operazioni concorrenti.
