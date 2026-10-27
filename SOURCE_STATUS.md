@@ -1,3 +1,17 @@
+# Alpha.8 acceptance — 2026-10-27 UTC
+
+Tested combined source: `bf328cc0dfff2d4a3877004d14f16aa6d1ab8e98`.
+[CI run 40504087723 passed](https://github.com/blasterfish7/murus_igneus/actions/runs/40504087723): 191 Python tests without skips, 10 Chromium checks, management TLS/transaction-lock fixture, 13 native/9 enterprise/17 parental packet checks and four real HTTPS feed downloads. The original ISO passes 46 UEFI/live checks using installed modules, including responsive management HTTPS and actual kernel verification of an already absent route before restoring working DNAT.
+
+Includes PR9 responsive status snapshots and PR10 corrected to verify network postconditions instead of ignoring command failures. Real conntrack/sysctl errors remain failures with safety fallback. Historical drafts #1/#4 are closed, branches preserved.
+
+ISO: `murus-igneus-0.3.0-alpha.8-devuan-amd64.iso`, 475123712 bytes, SHA256 `ffc6778201699ebf5a4677be7a7d986f0a1f66bbdce393ce64a8c58c4a5a0972`.
+DEB: 101916 bytes, SHA256 `554be9fce716be5b1ba3076b0cdeaabc5c10b88c853b4dee380a930838f4c6e8`.
+
+Original tested artifacts preserved in a private draft; final publication pending. Details: [ALPHA8](docs/ALPHA8.md), [ISO QA](docs/ISO-ALPHA8-QA.md), [structured summary](docs/qa/alpha8-validation.json). No new disk installation, hardware/Secure Boot or complete UTM efficacy claim. No Fortinet code/firmware.
+
+---
+
 # Published release — 0.3.0-alpha.7
 
 PR #8 is merged into main. [Download the alpha.7 prerelease](https://github.com/blasterfish7/murus_igneus/releases/tag/v0.3.0-alpha.7): original tested ISO, DEB, guide, checksums and acceptance report. Alpha.6 and previous published assets are preserved.
