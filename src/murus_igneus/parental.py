@@ -354,9 +354,10 @@ def dns_config(profile, settings, interface, feeds, management, study=False):
             raise Error('Un’eccezione non può riabilitare un resolver cifrato noto mentre DNS forzato è attivo')
         lines += ['server=/' + value + '/' + upstream for upstream in settings['upstream_servers']]
     if study:
-        lines += ['local=/#/']
+        lines += ['address=/#/']
         # During study even ordinary allow exceptions cannot widen the school allowlist.
-        lines = [line for line in lines if not line.startswith('server=/')]
+        # No default upstream in study mode: unmatched queries must never fall through.
+        lines = [line for line in lines if not line.startswith('server=')]
         for value in profile.get('study_domains', []):
             if not matches(value, blocked) and not (profile['enforce_dns'] and matches(value, set(ENCRYPTED_DNS))):
                 lines += ['server=/' + value + '/' + upstream for upstream in settings['upstream_servers']]

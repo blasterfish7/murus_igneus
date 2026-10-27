@@ -50,7 +50,7 @@ class FamilyTests(unittest.TestCase):
     def test_school_dns_is_allowlist_and_cannot_open_ordinary_exceptions(self):
         self.p.update(study_domains=['school.test'], allowed_domains=['ordinary.test'])
         text = parental.dns_config(self.p, self.s, self.plan['interfaces'][0], {}, 'eth0', study=True)
-        self.assertIn('local=/#/', text); self.assertIn('server=/school.test/192.0.2.2', text)
+        self.assertIn('address=/#/', text); self.assertNotIn('server=192.0.2.2', text); self.assertIn('server=/school.test/192.0.2.2', text)
         self.assertNotIn('server=/ordinary.test/', text)
 
     def test_school_allowlist_does_not_erase_baseline_service_block(self):

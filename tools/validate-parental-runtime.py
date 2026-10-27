@@ -220,7 +220,8 @@ for line in sys.stdin:
             active['study_windows']=[{'days':[0],'start':'16:00','end':'19:00'}];active['study_domains']=['school.test']
             parental.tick(datetime(2026,10,26,16,0,tzinfo=timezone.utc))
             assert query('school.test')['answers']>0
-            assert query('allowed.test')['answers']==0 and query('school.blocked.test')['answers']==0
+            unknown=query('allowed.test');ordinary=query('school.blocked.test')
+            assert unknown['answers']==0 and ordinary['answers']==0,(unknown,ordinary)
             assert query('www.google.com')['answers']==0
             active['study_windows']=[];parental.tick()
             assert query('allowed.test')['answers']>0 and query('www.google.com')['ip']=='216.239.38.120'
