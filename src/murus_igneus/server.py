@@ -172,15 +172,16 @@ def rollback(ident):
                 attempt('Arresto parental',parental.stop)
                 attempt('Arresto VPN/WAN',enterprise.stop)
                 attempt('Arresto DNS/DHCP',networking.stop)
-                for args in reversed(p['undo']):attempt('Ripristino rete',run,args)
+                # Best effort: an undo for something apply() never created must not block restoring the old rules.
+                for args in reversed(p['undo']):attempt('Ripristino rete',run,args,check=False)
                 attempt('Ripristino UTM/VPN',security.activate,p['security'])
                 attempt('Ripristino DNS/DHCP',networking.activate,service_settings(ACTIVE),MGMT)
                 attempt('Ripristino VPN/WAN',enterprise.activate,ACTIVE.get('enterprise',enterprise.defaults()) if ACTIVE else enterprise.defaults(),ACTIVE.get('configuration',{}).get('interfaces',[]) if ACTIVE else [])
                 attempt('Preparazione parental',parental.stage,ACTIVE.get('parental') if ACTIVE else None)
                 if not errors and attempt('Regole precedenti',run,['nft','-f','-'],p['old']):
                     attempt('Ripristino parental',parental.activate,ACTIVE.get('parental') if ACTIVE else None,STATE,MGMT)
-            attempt('Pulizia conntrack',run,['conntrack','-F'])
-            attempt('Ripristino forwarding',run,['sysctl','-w','net.ipv4.ip_forward='+p['forward']])
+            attempt('Pulizia conntrack',run,['conntrack','-F'],check=False)
+            attempt('Ripristino forwarding',run,['sysctl','-w','net.ipv4.ip_forward='+p['forward']],check=False)
         except Exception as exc:
             errors.append('Ripristino: '+str(exc)[:300])
         finally:
