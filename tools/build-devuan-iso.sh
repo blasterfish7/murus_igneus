@@ -17,8 +17,18 @@ cp "$project/packaging/devuan/sources.list" /etc/apt/sources.list
 rm -f /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources
 apt-get update
 apt-get install -y --no-install-recommends devuan-keyring debootstrap gnupg ca-certificates squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin grub2-common mtools dosfstools python3 xz-utils
-# Native Devuan debootstrap performs release signature verification. No non-free repository is enabled.
-debootstrap --force-check-gpg --variant=minbase --include=devuan-keyring excalibur "$root" http://deb.devuan.org/merged
+# Some signed Excalibur repositories ship upstream debootstrap without the suite alias.
+# Trixie uses the same packaged generic bootstrap backend. Keep the actual suite/mirror
+# on Devuan and require the Devuan archive keyring explicitly in either case.
+bootstrap_script=/usr/share/debootstrap/scripts/excalibur
+if [[ ! -r $bootstrap_script ]]; then
+    bootstrap_script=/usr/share/debootstrap/scripts/trixie
+    echo 'Excalibur alias unavailable: using the packaged Trixie bootstrap backend with the signed Devuan Excalibur archive.'
+fi
+bootstrap_keyring=/usr/share/keyrings/devuan-archive-keyring.gpg
+[[ -r $bootstrap_script && -r $bootstrap_keyring ]] || { echo 'Missing bootstrap backend or Devuan archive keyring'; exit 1; }
+debootstrap --keyring="$bootstrap_keyring" --force-check-gpg --variant=minbase --include=devuan-keyring excalibur "$root" http://deb.devuan.org/merged "$bootstrap_script"
+chroot "$root" sh -ec '. /etc/os-release; test "$ID" = devuan; case "$VERSION_ID" in 6|6.*) ;; *) exit 1;; esac'
 cleanup() {
     mountpoint -q "$root/dev" && umount -R "$root/dev" || true
     mountpoint -q "$root/proc" && umount -R "$root/proc" || true
