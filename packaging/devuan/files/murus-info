@@ -5,13 +5,21 @@ set -a
 . /etc/default/murus-igneus
 set +a
 exec /usr/bin/python3 - <<'PYTHON'
-import json,os,subprocess
+import json,os,subprocess,sys
 from pathlib import Path
+sys.path.insert(0,'/usr/lib/murus-igneus')
+from migration import VERSION
 port=os.environ.get('MURUS_MANAGEMENT_INTERFACE','eth0')
-print('Murus Igneus 0.3.0-alpha / Devuan 6 Excalibur')
-addresses=json.loads(subprocess.check_output(['ip','-j','-4','addr','show','dev',port],text=True))
+print('Murus Igneus '+VERSION+' / Devuan 6 Excalibur')
+try:addresses=json.loads(subprocess.check_output(['ip','-j','-4','addr','show','dev',port],text=True,stderr=subprocess.DEVNULL))
+except subprocess.CalledProcessError:addresses=[]
+print('Interfaccia di gestione: '+port)
 for interface in addresses:
     for address in interface.get('addr_info',[]):print('Gestione: https://'+address['local']+':8443')
+if not any(r.get('addr_info') for r in addresses):print('Nessun IPv4 di gestione. Controlla il bridge Proxmox/cavo e /etc/default/murus-igneus; poi rc-service murus-igneus restart.')
+print('Apri questi URL dal browser di un altro PC collegato alla rete di gestione; usa HTTPS e porta 8443.')
+print('Installazione web: pulsante Installa su disco. Dalla console live: murus-install (conferma il disco da cancellare).')
+print('Diagnostica servizio: rc-service murus-igneus status ; registro /var/log/murus-igneus.log')
 print('Utente web: admin | Password iniziale di laboratorio: igneus')
 print('Le credenziali già esistenti vengono conservate. Con la ISO ufficiale la console root usa la password di laboratorio igneus; con il solo pacchetto DEB resta quella di Devuan.')
 print('Alpha sperimentale: cambiare le password prima di collegare la rete a Internet.')

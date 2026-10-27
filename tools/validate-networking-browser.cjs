@@ -32,6 +32,11 @@ let browser;
     }
     await page.locator('#edit-dialog').getByRole('button', { name: 'Salva nella bozza', exact: true }).click();
   }
+  await page.locator('#install-home').click();
+  assert.equal(await page.locator('#install-page').isVisible(),true);
+  await page.waitForFunction(()=>document.getElementById('install-message').textContent.includes('Installer disponibile'));
+  checks.push('Home prominently opens the disk installer and shows the actual backend availability message');
+  await nav('Panoramica');
   await nav('Interfacce');
   await add({ name: 'WAN', device: 'eth1', address: '192.0.2.2/24' });
   await add({ name: 'TRUNK', device: 'eth2', address: '' });

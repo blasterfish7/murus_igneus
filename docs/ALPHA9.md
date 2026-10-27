@@ -15,6 +15,8 @@ Base Devuan 6 Excalibur/OpenRC. Implementazione indipendente con componenti open
 
 ## Installazione e uso
 
+La live è un appliance senza desktop: il browser si apre da un altro PC sulla rete di gestione. La console mostra ora indirizzo e porta HTTPS prima e dopo il login; `murus-info` riepiloga gli URL reali. L’installazione è raggiungibile dal pulsante «Installa su disco» in home. È disponibile anche `murus-install` da console root: elenca i dischi non montati di almeno 8 GiB e richiede la frase esatta `CANCELLA /dev/...` prima di modificare il disco. Nessuna conferma automatica. Console e web condividono un blocco di installazione per impedire operazioni concorrenti.
+
 Avviare la ISO e aprire la gestione HTTPS sulla porta 8443 dell'interfaccia di management. GUI admin/igneus, console live root/igneus; la password del sistema installato da DEB non viene cambiata. L'installer web è disponibile nella gestione. Un backup FortiGate è facoltativo: si può configurare da zero.
 
 Nella pagina Parental control creare una scheda per ogni figlio, assegnare IPv4 stabili, scegliere filtri e nuove funzioni, salvare la bozza e usare Verifica e applica con conferma entro 90 secondi. Nessun figlio/dispositivo viene aggiunto automaticamente. Il blocco IPv6 interessa l'intera LAN: leggere l'etichetta prima di selezionarlo. Bonus e pause operano sui profili già applicati.
@@ -23,4 +25,4 @@ Restano i limiti generali di un filtro al gateway: DNS cifrati/VPN sconosciuti, 
 
 ## Verifica
 
-I risultati di CI e della ISO originale saranno registrati in docs/ISO-ALPHA9-QA.md prima della pubblicazione. Le prove automatiche non certificano efficacia commerciale, hardware fisico o installazione su disco.
+I risultati della build pubblicata sono registrati in docs/ISO-ALPHA9-QA.md, distinguendo live, accesso web dalla rete e installazione/avvio su disco virtuale. Le prove non certificano efficacia commerciale o compatibilità con ogni hardware fisico.

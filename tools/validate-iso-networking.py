@@ -7,6 +7,10 @@ import os
 from pathlib import Path
 import re
 import shutil
+import socket
+import ssl
+import time
+import urllib.request
 import tempfile
 
 import pexpect
@@ -20,12 +24,17 @@ code = firmware / 'OVMF_CODE_4M.fd'; template = firmware / 'OVMF_VARS_4M.fd'
 assert code.is_file() and template.is_file(), 'OVMF 4M required'
 checks = []
 with tempfile.TemporaryDirectory(prefix='murus-iso-qa-') as work:
+    disk=Path(work)/'install-disk.raw'
+    with disk.open('wb') as file:file.truncate(16*1024**3)
+    with socket.socket() as listener:
+        listener.bind(('127.0.0.1',0));web_port=listener.getsockname()[1]
     variables = Path(work) / 'vars.fd'; shutil.copyfile(template, variables)
     args = ['qemu-system-x86_64', '-machine', 'q35,accel=tcg', '-cpu', 'max', '-smp', '2', '-m', '2048',
             '-drive', 'if=pflash,format=raw,readonly=on,file=' + str(code), '-drive', 'if=pflash,format=raw,file=' + str(variables),
             '-display', 'none', '-serial', 'stdio', '-monitor', 'none', '-no-reboot', '-boot', 'd', '-cdrom', str(iso)]
+    args += ['-drive','file='+str(disk)+',if=virtio,format=raw']
     for index in range(3):
-        args += ['-netdev', f'user,id=n{index}', '-device', f'virtio-net-pci,netdev=n{index},romfile=']
+        args += ['-netdev', f'user,id=n{index}'+(f',hostfwd=tcp:127.0.0.1:{web_port}-:8443' if index==0 else ''), '-device', f'virtio-net-pci,netdev=n{index},romfile=']
     child = pexpect.spawn(args[0], args[1:], encoding='utf-8', timeout=360)
     log = (ROOT / 'dist/alpha9-iso-console.log').open('w'); child.logfile = log
     try:
@@ -116,6 +125,20 @@ print('ISO_ROOT_PARENTAL_APPLY_ROLLBACK_OK')
         checks.append('Real HTTPS backend alpha.9, empty setup and native VLAN preview'); print('PASS ' + checks[-1], flush=True)
         checks.append('Real appliance HTTPS preview/apply starts owned strongSwan and rollback stops it'); print('PASS ' + checks[-1], flush=True)
         checks.append('Real appliance HTTPS parental apply starts resolver and rollback stops it'); print('PASS ' + checks[-1], flush=True)
+        remote=urllib.request.build_opener(urllib.request.ProxyHandler({}),urllib.request.HTTPSHandler(context=ssl._create_unverified_context()))
+        def web(path,data=None):
+            headers={'Authorization':'Basic '+base64.b64encode(b'admin:igneus').decode()}
+            if data is not None:headers.update({'Content-Type':'application/json','X-Murus-Igneus-CSRF':remote_csrf})
+            request=urllib.request.Request(f'https://127.0.0.1:{web_port}/'+path,headers=headers,data=json.dumps(data).encode() if data is not None else None)
+            with remote.open(request,timeout=20) as response:return response.read()
+        assert b'install-home' in web('')
+        remote_csrf=json.loads(web('api/status'))['csrf']
+        inventory=json.loads(web('api/installer'));assert inventory['live'] and any(d['path']=='/dev/vda' for d in inventory['disks']),inventory
+        preview=json.loads(web('api/installer/preview',{'disk':'/dev/vda'}));assert preview['confirmation']=='CANCELLA /dev/vda',preview
+        checks.append('Management HTTPS and live installer disk preview are reachable from outside the guest through the management NIC');print('PASS '+checks[-1],flush=True)
+        info=command('murus-info && murus-install --list')
+        assert 'https://' in info and ':8443' in info and '/dev/vda' in info and 'murus-install' in info,info
+        checks.append('Installed console helpers show real web URLs and list the blank installation disk without writing it');print('PASS '+checks[-1],flush=True)
         command('mkdir -p /tmp/murus-qa/tools /tmp/murus-qa/src && cp -a /usr/lib/murus-igneus /tmp/murus-qa/src/murus_igneus')
         status_payload=base64.b64encode(gzip.compress((ROOT/'tools/validate-status-runtime.py').read_bytes())).decode()
         command("python3 -c \"import base64,gzip;from pathlib import Path;Path('/tmp/murus-qa/tools/validate-status-runtime.py').write_bytes(gzip.decompress(base64.b64decode('"+status_payload+"')))\"")
@@ -151,11 +174,36 @@ print('ISO_ROOT_PARENTAL_APPLY_ROLLBACK_OK')
         assert parental_report['success'] and len(parental_report['checks']) == 23, parental_report
         checks += ['Devuan ISO: ' + item for item in parental_report['checks']]
         print('PASS parental packet suite on original ISO: 23 checks', flush=True)
+        # Install only onto the fresh sparse disk created by this disposable QEMU fixture.
+        child.sendline("murus-install --disk /dev/vda; printf '\\n__MIQA_INSTALL_END__:%s\\n' \"$?\"")
+        child.expect(r'Conferma \(Invio per annullare\): ',timeout=30)
+        child.sendline('CANCELLA /dev/vda')
+        child.expect(r'\r*\n__MIQA_INSTALL_END__:(\d+)\r*\n',timeout=900)
+        install_output=child.before;status=int(child.match.group(1));child.expect(prompt)
+        assert status==0 and 'INSTALLAZIONE COMPLETATA' in install_output,install_output[-6000:]
+        checks.append('Console installer explicitly confirms and installs onto the disposable 16 GiB virtual disk');print('PASS '+checks[-1],flush=True)
         child.sendline('poweroff'); child.expect(pexpect.EOF, timeout=300)
         checks.append('Graceful live VM poweroff'); print('PASS ' + checks[-1], flush=True)
+        child.close()
+        disk_args=args.copy();cd=disk_args.index('-cdrom');del disk_args[cd:cd+2];disk_args[disk_args.index('-boot')+1]='c'
+        child=pexpect.spawn(disk_args[0],disk_args[1:],encoding='utf-8',timeout=360);child.logfile=log
+        child.expect(r'login:');child.sendline('root');child.expect('Password:');child.sendline('igneus');child.expect(r'root@[^\r\n]*[#$] ')
+        child.sendline("export PS1='MIQA# '");child.expect(prompt)
+        assert 'boot=live' not in command('cat /proc/cmdline')
+        for attempt in range(60):
+            try:
+                status=json.loads(web('api/status'))
+                if status['version']=='0.3.0-alpha.9':break
+            except OSError:pass
+            time.sleep(2)
+        else:raise AssertionError('Installed disk HTTPS unavailable')
+        assert json.loads(web('api/installer'))['live'] is False
+        checks.append('Installed disk boots independently with the ISO detached and serves management HTTPS through the NIC');print('PASS '+checks[-1],flush=True)
+        child.sendline('poweroff');child.expect(pexpect.EOF,timeout=300)
+        checks.append('Graceful installed VM poweroff');print('PASS '+checks[-1],flush=True)
         with iso.open('rb') as file:
             digest = hashlib.file_digest(file, 'sha256').hexdigest()
-        result = {'success': True, 'checks': checks, 'iso': iso.name, 'sha256': digest, 'scope': 'QEMU TCG UEFI live boot; installed product modules exercised with real packets inside isolated guest namespaces. No disk installation, Secure Boot or physical hardware test.'}
+        result = {'success': True, 'checks': checks, 'iso': iso.name, 'sha256': digest, 'scope': 'QEMU TCG UEFI live boot; installed product modules exercised with real packets inside isolated guest namespaces. Explicit console installation on a fresh 16 GiB virtual disk and autonomous UEFI disk boot with management HTTPS verified. No BIOS, Secure Boot or physical hardware test.'}
         (ROOT / 'dist/alpha9-iso-networking-qa.json').write_text(json.dumps(result, indent=2) + '\n')
     finally:
         if child.isalive():

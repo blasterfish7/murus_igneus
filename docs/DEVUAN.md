@@ -147,3 +147,8 @@ antivirus verification and is reported as such. The test never selects or
 erases a disk.
 
 
+
+
+## Live console and web entry
+
+The live image is headless. On Proxmox attach the management NIC to the bridge used by the administrator's PC. The boot console displays its IPv4 URL on HTTPS port 8443; `murus-info` repeats the actual addresses after root login. The main web page has an explicit Install button. `murus-install` is the independent interactive console installer and `murus-install --list` is read-only. Linux `install` is unrelated. A destination must be an unmounted disk of at least 8 GiB, selected explicitly and confirmed by typing its full deletion phrase. Web and console operations share a cross-process installation lock.

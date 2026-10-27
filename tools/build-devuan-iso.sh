@@ -101,6 +101,7 @@ NETWORK
 mkdir -p "$root/etc/dhcp/dhclient-enter-hooks.d" "$root/etc/murus_igneus"
 printf 'if [ "$interface" = eth0 ]; then new_routers=""; fi\n' > "$root/etc/dhcp/dhclient-enter-hooks.d/murus-management"
 printf 'timeout 10;\nretry 30;\ninitial-interval 1;\n' > "$root/etc/dhcp/dhclient.conf"
+printf 'Murus Igneus 0.3.0-alpha.9 — Devuan 6\nGestione da un altro PC: https://\\4{eth0}:8443 (admin / igneus)\nDopo login root / igneus: murus-info mostra gli indirizzi; murus-install avvia l’installazione guidata da console.\n\n' > "$root/etc/issue"
 printf 'root:igneus\n' | chroot "$root" chpasswd
 printf 'igneus\n' > "$root/etc/murus_igneus/admin.password"
 chmod 700 "$root/etc/murus_igneus"
