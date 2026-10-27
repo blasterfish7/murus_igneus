@@ -52,6 +52,8 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/murus-browser" playwright-core@1.64.1 @sparticuz/chromium@153.0.0
           node tools/prepare-browser.cjs "$RUNNER_TEMP/murus-browser"
           MURUS_PLAYWRIGHT="$RUNNER_TEMP/murus-browser/node_modules/playwright-core" MURUS_CHROMIUM="$RUNNER_TEMP/murus-browser/bin/chromium" node tools/validate-networking-browser.cjs
+      - name: Management HTTPS remains responsive during transaction locking
+        run: MURUS_LAB=YES python3 tools/validate-status-runtime.py
       - name: Save browser acceptance report
         continue-on-error: true
         uses: actions/upload-artifact@v4
@@ -162,8 +164,8 @@ jobs:
             dist/packages-devuan.tsv
             dist/signature-status.txt
             dist/clamav-build.log
-            dist/alpha7-iso-networking-qa.json
-            dist/alpha7-iso-console.log
+            dist/alpha8-iso-networking-qa.json
+            dist/alpha8-iso-console.log
           compression-level: 0
           retention-days: 2
 

@@ -116,6 +116,25 @@ class ServerTests(unittest.TestCase):
         finally:
             pw.write_text(content)
 
+    def test_status_responds_while_lock_is_held(self):
+        """apply() holds LOCK during service activation; UI polling must not stall."""
+        held, release = threading.Event(), threading.Event()
+
+        def hold():
+            with server.LOCK:
+                held.set()
+                release.wait(10)
+        thread = threading.Thread(target=hold, daemon=True)
+        thread.start()
+        self.assertTrue(held.wait(5))
+        try:
+            for path in ('/api/status', '/api/auth/status'):
+                status = self.request('GET', path, timeout=2)[0]
+                self.assertEqual(status, 200, path)
+        finally:
+            release.set()
+            thread.join(5)
+
 
 def nested_groups(kind, depth):
     """g0 = {leaf}, g_i = {g_(i-1), g_(i-1)}: expands to 2**depth entries without memoization."""
@@ -176,4 +195,3 @@ class NestedGroupTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-

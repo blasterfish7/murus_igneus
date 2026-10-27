@@ -160,6 +160,14 @@ print(json.dumps({'address':socket.inet_ntoa(ack[16:20]),'gateway':socket.inet_n
         dns('milan', '198.51.100.1'); ok('Unconfirmed publication removal rolls back automatically after 90 seconds, including DNS')
         saved = json.loads((server.STATE / 'active.json').read_text()); assert saved['configuration']['dns'] == config['dns']
         assert saved['configuration']['interfaces'][2]['vlan_id'] == 20; ok('Confirmed native settings persisted in active.json')
+        # A route already removed by cleanup is harmless only after kernel readback.
+        ident = apply(disabled, confirm=False)
+        with server.LOCK:
+            server.PENDING['undo'].append(['ip','route','del','203.0.113.0/24'])
+            recovered = server.rollback(ident)
+        assert recovered['ok'] and server.PENDING is None, (recovered,server.LAST)
+        assert http().get('status') == 200
+        ok('An already absent route is verified in the kernel and does not prevent restoring working DNAT')
         # Exercise an actual nft parser failure during recovery; forwarding must stay closed.
         ident = apply(disabled, confirm=False)
         with server.LOCK:
