@@ -266,15 +266,17 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self.auth():return
         try:
+            # Polling reads a short snapshot without waiting for service activation.
+            if self.path=='/api/auth/status':return self.reply(200,{'enabled':bool(authentication.read(STATE)),'verified':self.mfa_session(),'csrf':CSRF})
+            if self.path=='/api/status':
+                current=PENDING;pending=current.copy() if current else None;last=LAST
+                links=json.loads(run(['ip','-j','link']))
+                return self.reply(200,{'version':VERSION,'csrf':CSRF,'management':MGMT,'links':[x['ifname'] for x in links if x['ifname'] not in (MGMT,'lo')],'last':last,'maintenance':jobs.busy(),'pending':{'id':pending['id'],'deadline':pending['deadline'],'remaining':max(0,pending['deadline']-time.time())} if pending else None})
             with LOCK:
-                if self.path=='/api/auth/status':self.reply(200,{'enabled':bool(authentication.read(STATE)),'verified':self.mfa_session(),'csrf':CSRF})
-                elif self.path=='/api/events':self.reply(200,eventlog.history(STATE))
+                if self.path=='/api/events':self.reply(200,eventlog.history(STATE))
                 elif self.path in ('/api/parental/report/1','/api/parental/report/7'):self.reply(200,parental.reporting.report(STATE,int(self.path[-1])))
                 elif self.path=='/api/parental':self.reply(200,parental.inventory(STATE))
                 elif self.path=='/api/enterprise':self.reply(200,enterprise.health())
-                elif self.path=='/api/status':
-                    links=json.loads(run(['ip','-j','link']))
-                    self.reply(200,{'version':VERSION,'csrf':CSRF,'management':MGMT,'links':[x['ifname'] for x in links if x['ifname'] not in (MGMT,'lo')],'last':LAST,'maintenance':jobs.busy(),'pending':{'id':PENDING['id'],'deadline':PENDING['deadline'],'remaining':max(0,PENDING['deadline']-time.time())} if PENDING else None})
                 elif self.path=='/api/configuration':self.reply(200,{'configuration':ACTIVE.get('configuration') if ACTIVE else {**empty(),**security.defaults(),**networking.defaults(),**enterprise.defaults(),**parental.defaults()},'legacy':bool(ACTIVE and not ACTIVE.get('configuration'))})
                 elif self.path=='/api/assistant':self.reply(200,{'settings':{**assistant.load(STATE),'key_configured':(STATE/'openai.key').exists()},'models':assistant.MODELS,'task':assistant.TASK.status()})
                 elif self.path=='/api/switches':self.reply(200,switches.inventory(STATE))
