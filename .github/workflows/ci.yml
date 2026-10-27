@@ -1,4 +1,4 @@
-name: Diagnose Devuan bootstrap metadata
+name: Diagnose Devuan bootstrap trust package
 on:
   push:
     branches: [codex/devuan-bootstrap-diagnostics]
@@ -13,22 +13,24 @@ jobs:
       options: --privileged
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect signed archive and seed package metadata
+      - name: Verify seed trust anchors and bootstrap a signed fresh root
         shell: bash
         run: |
           set -euxo pipefail
           cp packaging/devuan/sources.list /etc/apt/sources.list
           rm -f /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources
           apt-get update
-          apt-cache policy devuan-keyring base-files apt debootstrap
-          dpkg-query -W devuan-keyring base-files apt
-          dpkg -L devuan-keyring
-          cat /etc/os-release
-          apt-config dump | sed -n '/IndexTargets/,/};/p'
-          apt-get install -y --no-install-recommends mmdebstrap
-          mmdebstrap --mode=root --format=directory --variant=minbase --architectures=amd64 --keyring=/usr/share/keyrings/devuan-archive-keyring.gpg --include=apt,devuan-keyring --aptopt='Acquire::AllowInsecureRepositories "false"' --aptopt='APT::Get::AllowUnauthenticated "false"' excalibur /tmp/diag-devuan-root packaging/devuan/sources.list || true
-          if [ -e /tmp/diag-devuan-root/etc/os-release ]; then cat /tmp/diag-devuan-root/etc/os-release; fi
-          if [ -x /tmp/diag-devuan-root/usr/bin/apt-cache ]; then
-            chroot /tmp/diag-devuan-root apt-cache policy devuan-keyring base-files apt
-            ls -lh /tmp/diag-devuan-root/var/lib/apt/lists/
-          fi
+          apt-get install -y --no-install-recommends mmdebstrap dpkg-repack
+          dpkg -V devuan-keyring
+          mkdir /tmp/diag-keyring
+          cd /tmp/diag-keyring
+          dpkg-repack devuan-keyring
+          sha256sum *.deb
+          mmdebstrap --mode=root --format=directory --variant=minbase --architectures=amd64 --keyring=/usr/share/keyrings/devuan-archive-keyring.gpg --include=apt --aptopt='Acquire::AllowInsecureRepositories "false"' --aptopt='APT::Get::AllowUnauthenticated "false"' excalibur /tmp/diag-devuan-root "$GITHUB_WORKSPACE/packaging/devuan/sources.list"
+          cp devuan-keyring_*.deb /tmp/diag-devuan-root/tmp/trust.deb
+          chroot /tmp/diag-devuan-root dpkg -i /tmp/trust.deb
+          cp "$GITHUB_WORKSPACE/packaging/devuan/sources.list" /tmp/diag-devuan-root/etc/apt/sources.list
+          chroot /tmp/diag-devuan-root apt-get update
+          chroot /tmp/diag-devuan-root apt-cache policy devuan-keyring base-files apt
+          cat /tmp/diag-devuan-root/etc/os-release
+          chroot /tmp/diag-devuan-root dpkg-query -W devuan-keyring base-files apt
