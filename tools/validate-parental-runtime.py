@@ -143,8 +143,8 @@ ThreadingHTTPServer(('0.0.0.0',8080),HTTP).serve_forever()
         ok('SafeSearch AAAA requests cannot leak to the unrestricted upstream resolver')
         # Prove the opt-in whole-LAN IPv6 guard overrides a deliberately permissive later chain.
         run(['sysctl','-w','net.ipv6.conf.all.forwarding=1'])
-        run(['ip','-6','addr','add','fd60::1/64','dev','lan0']);run(['ip','-6','addr','add','fd61::1/64','dev','wan0'])
-        ns('pc-kid',['ip','-6','addr','add','fd60::10/64','dev','eth0']);ns('pc-up',['ip','-6','addr','add','fd61::2/64','dev','eth0'])
+        run(['ip','-6','addr','add','fd60::1/64','dev','lan0','nodad']);run(['ip','-6','addr','add','fd61::1/64','dev','wan0','nodad'])
+        ns('pc-kid',['ip','-6','addr','add','fd60::10/64','dev','eth0','nodad']);ns('pc-up',['ip','-6','addr','add','fd61::2/64','dev','eth0','nodad'])
         ns('pc-kid',['ip','-6','route','add','default','via','fd60::1']);ns('pc-up',['ip','-6','route','add','default','via','fd61::1'])
         v6fixture="import socket;s=socket.socket(socket.AF_INET6,socket.SOCK_STREAM);s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1);s.bind(('fd61::2',8082));s.listen()\nwhile True:\n c,a=s.accept();c.sendall(b'ipv6');c.close()"
         processes.append(subprocess.Popen(['ip','netns','exec','pc-up','python3','-c',v6fixture],stderr=sys.stderr));time.sleep(.2)
