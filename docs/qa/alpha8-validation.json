@@ -1,0 +1,16 @@
+{
+  "version": "0.3.0-alpha.8",
+  "source_sha": "bf328cc0dfff2d4a3877004d14f16aa6d1ab8e98",
+  "run_id": 40504087723,
+  "python_tests": 191,
+  "python_skips": 0,
+  "chromium_checks": 10,
+  "native_packet_checks": 13,
+  "enterprise_packet_checks": 9,
+  "parental_packet_checks": 17,
+  "real_https_category_feeds": 4,
+  "management_tls_lock_fixture": true,
+  "iso_uefi_checks": 46,
+  "iso_sha256": "ffc6778201699ebf5a4677be7a7d986f0a1f66bbdce393ce64a8c58c4a5a0972",
+  "scope": "Disposable kernel/network namespace packets and QEMU TCG UEFI live ISO, including already-absent route recovery and a loopback TLS lock fixture using installed modules. No disk installation, physical hardware or full UTM efficacy claim."
+}

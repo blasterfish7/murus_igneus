@@ -157,6 +157,53 @@ def password_attempt(peer,ok):
         _password_record(peer,ok,now)
         return True
 
+def undo_satisfied(args):
+    """Read back exact postconditions after an unsuccessful owned network undo."""
+    try:
+        if args[:2]==['ip','route'] and args[2] in ('add','del') and len(args)>=4:
+            destination=args[3]
+            target=ipaddress.IPv4Network('0.0.0.0/0' if destination=='default' else destination,strict=False)
+            tail=args[4:]
+            if len(tail)%2:return False
+            options=dict(zip(tail[::2],tail[1::2]))
+            if len(options)*2!=len(tail) or set(options)-{'via','dev','metric'}:return False
+            rows=json.loads(run(['ip','-j','-4','route','show','exact',destination]))
+            if not isinstance(rows,list):return False
+            if any(ipaddress.IPv4Network('0.0.0.0/0' if r.get('dst','default')=='default' else r['dst'],strict=False)!=target for r in rows):return False
+            matches=[r for r in rows if all(str(r.get({'via':'gateway','dev':'dev','metric':'metric'}[k],0 if k=='metric' else ''))==v for k,v in options.items())]
+            return bool(matches) if args[2]=='add' else not matches
+        if args[:2]==['ip','addr'] and len(args)==6 and args[2] in ('add','del') and args[4]=='dev':
+            target=ipaddress.IPv4Interface(args[3]);rows=json.loads(run(['ip','-j','-4','addr','show']))
+            if not isinstance(rows,list):return False
+            found=any(a.get('local')==str(target.ip) and a.get('prefixlen')==target.network.prefixlen for r in rows if r.get('ifname')==args[5] for a in r.get('addr_info',[]))
+            return found if args[2]=='add' else not found
+        if args[:2]!=['ip','link']:return False
+        rows=json.loads(run(['ip','-j','-d','link']))
+        if not isinstance(rows,list):return False
+        if args[2:4]==['del','dev'] and len(args)==5:
+            return not any(r.get('ifname')==args[4] for r in rows)
+        if args[2:4]==['set','dev'] and len(args) in (6,7):
+            row=next((r for r in rows if r.get('ifname')==args[4]),None)
+            if len(args)==6 and args[5] in ('up','down'):
+                if row is not None and not isinstance(row.get('flags'),list):return False
+                return bool(row and 'UP' in row.get('flags',[])) if args[5]=='up' else not row or 'UP' not in row.get('flags',[])
+            if len(args)==7 and args[5]=='alias':return row is not None and row.get('ifalias','')==args[6]
+        if len(args)==11 and args[:4]==['ip','link','add','link'] and args[5]=='name' and args[7:10]==['type','vlan','id']:
+            parent=next((r for r in rows if r.get('ifname')==args[4]),None)
+            row=next((r for r in rows if r.get('ifname')==args[6]),None)
+            if not parent or not row:return False
+            info=row.get('linkinfo',{})
+            return info.get('info_kind')=='vlan' and info.get('info_data',{}).get('id')==int(args[10]) and (row.get('link')==args[4] or (parent.get('ifindex') is not None and row.get('link_index')==parent['ifindex']))
+    except Exception:
+        return False
+    return False
+
+def undo_network(args):
+    try:run(args)
+    except Exception:
+        # A failed command is harmless only when the intended state is actually verified.
+        if not undo_satisfied(args):raise
+
 def rollback(ident):
     global PENDING,LAST
     with LOCK:
@@ -172,7 +219,7 @@ def rollback(ident):
                 attempt('Arresto parental',parental.stop)
                 attempt('Arresto VPN/WAN',enterprise.stop)
                 attempt('Arresto DNS/DHCP',networking.stop)
-                for args in reversed(p['undo']):attempt('Ripristino rete',run,args)
+                for args in reversed(p['undo']):attempt('Ripristino rete',undo_network,args)
                 attempt('Ripristino UTM/VPN',security.activate,p['security'])
                 attempt('Ripristino DNS/DHCP',networking.activate,service_settings(ACTIVE),MGMT)
                 attempt('Ripristino VPN/WAN',enterprise.activate,ACTIVE.get('enterprise',enterprise.defaults()) if ACTIVE else enterprise.defaults(),ACTIVE.get('configuration',{}).get('interfaces',[]) if ACTIVE else [])
