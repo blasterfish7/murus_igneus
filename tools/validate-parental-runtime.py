@@ -149,6 +149,7 @@ ThreadingHTTPServer(('0.0.0.0',8080),HTTP).serve_forever()
         v6fixture="import socket;s=socket.socket(socket.AF_INET6,socket.SOCK_STREAM);s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1);s.bind(('fd61::2',8082));s.listen()\nwhile True:\n c,a=s.accept();c.sendall(b'ipv6');c.close()"
         processes.append(subprocess.Popen(['ip','netns','exec','pc-up','python3','-c',v6fixture],stderr=sys.stderr));time.sleep(.2)
         run(['nft','insert','rule','inet','murus_igneus','forward','meta','nfproto','ipv6','accept'])
+        run(['nft','insert','rule','inet','murus_igneus','input','meta','nfproto','ipv6','accept'])
         v6client="import socket;s=socket.socket(socket.AF_INET6,socket.SOCK_STREAM);s.settimeout(3)\ntry:s.connect(('fd61::2',8082));print(s.recv(16).decode())\nexcept OSError:print('BLOCKED')"
         assert ns('pc-kid',['python3','-c',v6client])=='BLOCKED'
         for chain in ['pc_forward','pc_input','pc_output']:
@@ -157,7 +158,7 @@ ThreadingHTTPServer(('0.0.0.0',8080),HTTP).serve_forever()
                 rule=entry.get('rule',{})
                 if any(e.get('match',{}).get('right')=='ipv6' for e in rule.get('expr',[])):
                     run(['nft','delete','rule','inet','murus_igneus',chain,'handle',str(rule['handle'])])
-        assert ns('pc-kid',['python3','-c',v6client])=='ipv6'
+        positive=ns('pc-kid',['python3','-c',v6client]);assert positive=='ipv6',(positive,run(['ip','-6','neigh']),ns('pc-kid',['ip','-6','neigh']))
         ok('Opt-in IPv6 guard blocks actual routed packets on the whole protected LAN before a permissive forwarding rule')
 
         # Sample the real named counters and dnsmasq query stream; no fabricated telemetry.
