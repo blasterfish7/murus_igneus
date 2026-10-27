@@ -306,7 +306,8 @@ def update_feed(state, category):
         with LOCK:
             save_feed(state, category, payload)
         return {'category': category, 'domains': len(payload['domains']), 'message': 'Lista aggiornata. Verifica e riapplica la bozza per usarla nei profili.'}
-    return TASK.start(action)
+    with LOCK:
+        return TASK.start(action)
 
 
 def load_domains(settings, state):
@@ -758,6 +759,7 @@ def maybe_update():
                 return refresh_active_lists(expected)
             except Exception as exc:
                 with LOCK:
-                    AUTO_STATUS['error'] = str(exc)[:300]
+                    if CURRENT is expected:
+                        AUTO_STATUS['error'] = str(exc)[:300]
                 raise
         TASK.start(action)
