@@ -164,8 +164,8 @@ jobs:
             dist/packages-devuan.tsv
             dist/signature-status.txt
             dist/clamav-build.log
-            dist/alpha8-iso-networking-qa.json
-            dist/alpha8-iso-console.log
+            dist/alpha9-iso-networking-qa.json
+            dist/alpha9-iso-console.log
           compression-level: 0
           retention-days: 2
 

@@ -47,17 +47,17 @@ def apply(config,confirm=True):
     return ident
 
 
-def query(domain,source='10.60.0.10',tcp=False,target='1.1.1.1'):
+def query(domain,source='10.60.0.10',tcp=False,target='1.1.1.1',qtype=1):
     code=r'''import socket,struct,json
 s=socket.socket(socket.AF_INET,socket.SOCK_STREAM if TCP else socket.SOCK_DGRAM);s.bind((SOURCE,0));s.settimeout(2)
-packet=struct.pack('!6H',4321,256,1,0,0,0)+b''.join(bytes([len(v)])+v.encode() for v in DOMAIN.split('.'))+b'\0'+struct.pack('!HH',1,1)
+packet=struct.pack('!6H',4321,256,1,0,0,0)+b''.join(bytes([len(v)])+v.encode() for v in DOMAIN.split('.'))+b'\0'+struct.pack('!HH',QTYPE,1)
 if TCP:
  s.connect((TARGET,53));s.sendall(struct.pack('!H',len(packet))+packet);length=struct.unpack('!H',s.recv(2))[0];data=b''
  while len(data)<length:data+=s.recv(length-len(data))
 else:s.sendto(packet,(TARGET,53));data=s.recv(4096)
-print(json.dumps({'rcode':data[3]&15,'answers':struct.unpack('!H',data[6:8])[0],'ip':socket.inet_ntoa(data[-4:]) if len(data)>=4 else ''}))
+print(json.dumps({'rcode':data[3]&15,'answers':struct.unpack('!H',data[6:8])[0],'wire':data.hex(),'ip':socket.inet_ntoa(data[-4:]) if len(data)>=4 else ''}))
 '''
-    return json.loads(ns('pc-kid',['python3','-c',f'DOMAIN={domain!r};SOURCE={source!r};TCP={tcp!r};TARGET={target!r}\n'+code]))
+    return json.loads(ns('pc-kid',['python3','-c',f'DOMAIN={domain!r};SOURCE={source!r};TCP={tcp!r};TARGET={target!r};QTYPE={qtype!r}\n'+code]))
 
 
 def http(domain='192.0.2.2',source='10.60.0.10',use_proxy=False):
@@ -115,7 +115,7 @@ ThreadingHTTPServer(('0.0.0.0',8080),HTTP).serve_forever()
         c['dhcp']=[{'interface':'LAN','start':'10.60.0.100','end':'10.60.0.110','lease_hours':12,'dns_servers':['192.0.2.2'],'enabled':True}]
         c['dhcp_reservations']=[{'interface':'LAN','mac':'02:00:00:00:00:01','address':'10.60.0.105','name':'child-device','enabled':True}]
         c.update(parental.defaults());c['parental'].update(enabled=True,reporting=True,upstream_servers=['192.0.2.2'])
-        p={'id':1,'name':'Child lab','enabled':True,'interface':'LAN','clients':['10.60.0.10','10.60.0.105'],'categories':['adult'],'services':['instagram'],'blocked_domains':['blocked.test'],'allowed_domains':['school.blocked.test'],'windows':[],'paused':False,'enforce_dns':True,'block_quic':False}
+        p={'id':1,'name':'Child lab','enabled':True,'interface':'LAN','clients':['10.60.0.10','10.60.0.105'],'categories':['adult'],'services':['instagram'],'blocked_domains':['blocked.test'],'allowed_domains':['school.blocked.test'],'windows':[],'paused':False,'enforce_dns':True,'block_quic':False,'safe_search':True,'youtube_restricted':'strict','block_ipv6':True,'devices':[{'name':'Telefono','address':'10.60.0.10'},{'name':'Tablet','address':'10.60.0.105'}]}
         c['parental']['profiles']=[p]
         security.write(parental.feed_path('adult',work),json.dumps({'domains':['adult.test'],'category':'adult','updated':time.time(),'sha256':'lab','source':'controlled-fixture'}))
         apply(c)
@@ -135,6 +135,31 @@ ThreadingHTTPServer(('0.0.0.0',8080),HTTP).serve_forever()
         ok('Direct DNS-over-TLS on TCP 853 is blocked for protected clients')
         assert http()['status']==200
         ok('Allowed Internet forwarding and SNAT remain operational')
+        for host in ['www.google.com','www.google.it','www.youtube.com','m.youtube.com','youtubei.googleapis.com']:
+            answer=query(host);assert answer['ip']=='216.239.38.120',answer
+        ok('Google SafeSearch and YouTube strict mode return actual restricted VIP records through forced DNS')
+        answer=query('www.google.com',qtype=28)
+        assert 'cb00714d' not in answer['wire'],answer  # Fixture upstream returns an A even for AAAA: must not be contacted.
+        ok('SafeSearch AAAA requests cannot leak to the unrestricted upstream resolver')
+        # Prove the opt-in whole-LAN IPv6 guard overrides a deliberately permissive later chain.
+        run(['sysctl','-w','net.ipv6.conf.all.forwarding=1'])
+        run(['ip','-6','addr','add','fd60::1/64','dev','lan0']);run(['ip','-6','addr','add','fd61::1/64','dev','wan0'])
+        ns('pc-kid',['ip','-6','addr','add','fd60::10/64','dev','eth0']);ns('pc-up',['ip','-6','addr','add','fd61::2/64','dev','eth0'])
+        ns('pc-kid',['ip','-6','route','add','default','via','fd60::1']);ns('pc-up',['ip','-6','route','add','default','via','fd61::1'])
+        v6fixture="import socket;s=socket.socket(socket.AF_INET6,socket.SOCK_STREAM);s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1);s.bind(('fd61::2',8082));s.listen()\nwhile True:\n c,a=s.accept();c.sendall(b'ipv6');c.close()"
+        processes.append(subprocess.Popen(['ip','netns','exec','pc-up','python3','-c',v6fixture],stderr=sys.stderr));time.sleep(.2)
+        run(['nft','insert','rule','inet','murus_igneus','forward','meta','nfproto','ipv6','accept'])
+        v6client="import socket;s=socket.socket(socket.AF_INET6,socket.SOCK_STREAM);s.settimeout(3)\ntry:s.connect(('fd61::2',8082));print(s.recv(16).decode())\nexcept OSError:print('BLOCKED')"
+        assert ns('pc-kid',['python3','-c',v6client])=='BLOCKED'
+        for chain in ['pc_forward','pc_input','pc_output']:
+            handles=json.loads(run(['nft','-j','-a','list','chain','inet','murus_igneus',chain]))
+            for entry in handles['nftables']:
+                rule=entry.get('rule',{})
+                if any(e.get('match',{}).get('right')=='ipv6' for e in rule.get('expr',[])):
+                    run(['nft','delete','rule','inet','murus_igneus',chain,'handle',str(rule['handle'])])
+        assert ns('pc-kid',['python3','-c',v6client])=='ipv6'
+        ok('Opt-in IPv6 guard blocks actual routed packets on the whole protected LAN before a permissive forwarding rule')
+
         # Sample the real named counters and dnsmasq query stream; no fabricated telemetry.
         time.sleep(.25);parental.REPORTER.collect()
         report=parental.reporting.report(work)
@@ -170,6 +195,41 @@ for line in sys.stdin:
         parental.pause(1,0);assert http()['status']==200
         ok('Resume removes temporary pause and restores Internet access')
         with parental.LOCK:
+            active=parental.CURRENT['settings']['profiles'][0]
+            local=datetime.now(parental.ZoneInfo('Europe/Rome')); start=(local.hour+23)%24;end=(local.hour+1)%24
+            active['night_windows']=[{'days':list(range(7)),'start':f'{start:02d}:00','end':f'{end:02d}:00'}]
+            parental.tick();assert 'error' in http()
+            parental.bonus(1,30);assert http()['status']==200
+            assert query('instagram.com')['answers']==0
+            parental.pause(1,1);assert 'error' in http();parental.pause(1,0);assert http()['status']==200
+            parental.bonus(1,0);assert 'error' in http()
+            active['night_windows']=[];parental.tick();assert http()['status']==200
+        ok('Night blocks Internet; a timed bonus restores access with DNS filtering, while manual pause and bonus revocation still block')
+        with parental.LOCK:
+            active['study_windows']=[{'days':[0],'start':'16:00','end':'19:00'}];active['study_domains']=['school.test']
+            parental.tick(datetime(2026,10,26,16,0,tzinfo=timezone.utc))
+            assert query('school.test')['answers']>0
+            assert query('allowed.test')['answers']==0 and query('school.blocked.test')['answers']==0
+            assert query('www.google.com')['answers']==0
+            active['study_windows']=[];parental.tick()
+            assert query('allowed.test')['answers']>0 and query('www.google.com')['ip']=='216.239.38.120'
+        ok('Entering study mode switches real DNS to the school allowlist; leaving restores normal filtering and SafeSearch')
+        with parental.LOCK:
+            expected=parental.CURRENT
+            payload={'category':'adult','domains':['newadult.test'],'updated':time.time(),'sha256':'controlled-refresh','source':'controlled-fixture'}
+            with patch.object(parental,'download_feed',return_value=payload):parental.refresh_active_lists(expected)
+            assert query('newadult.test')['answers']==0 and query('adult.test')['answers']>0
+            assert http()['status']==200
+            with patch.object(parental,'download_feed',side_effect=ValueError('invalid HTML')):
+                try:parental.refresh_active_lists(expected);raise AssertionError('Invalid refresh accepted')
+                except ValueError:pass
+            assert query('newadult.test')['answers']==0 and http()['status']==200
+            # Restore the original fixture so later rollback tests use the same baseline.
+            payload['domains']=['adult.test']
+            with patch.object(parental,'download_feed',return_value=payload):parental.refresh_active_lists(expected)
+        ok('Automatic refresh path activates validated category data in actual resolvers and keeps it after a failed subsequent download')
+
+        with parental.LOCK:
             parental.CURRENT['settings']['profiles'][0]['windows']=[{'days':[0],'start':'16:00','end':'17:00'}]
             parental.tick(datetime(2026,10,26,18,0,tzinfo=timezone.utc));assert 'error' in http()
             parental.tick(datetime(2026,10,26,15,30,tzinfo=timezone.utc));assert http()['status']==200
@@ -199,5 +259,5 @@ for line in sys.stdin:
         parental.stop();security.activate(security.defaults());server.networking.stop()
         for process in processes:process.terminate();process.wait(timeout=5)
         for name in ['pc-kid','pc-up']:run(['ip','netns','del',name],check=False)
-        (ROOT/'dist').mkdir(exist_ok=True);(ROOT/'dist/parental-runtime-qa.json').write_text(json.dumps({'success':len(checks)==17,'checks':checks,'scope':'Real dnsmasq/nftables/DHCP/TCP and the actual HTTP proxy with a controlled clean-scanner fixture; no mobile network, real encrypted app efficacy or commercial category certification.'},indent=2))
-assert len(checks)==17,checks
+        (ROOT/'dist').mkdir(exist_ok=True);(ROOT/'dist/parental-runtime-qa.json').write_text(json.dumps({'success':len(checks)==23,'checks':checks,'scope':'Real dnsmasq/nftables/DHCP/TCP and the actual HTTP proxy with a controlled clean-scanner fixture; no mobile network, real encrypted app efficacy or commercial category certification.'},indent=2))
+assert len(checks)==23,checks

@@ -29,7 +29,7 @@ install -m 0644 "$root/docs/ALPHA5.md" "$stage/usr/share/doc/murus-igneus/ALPHA5
 install -m 0644 "$root/docs/PARENTAL.md" "$stage/usr/share/doc/murus-igneus/PARENTAL.md"
 cat > "$stage/DEBIAN/control" <<'EOF'
 Package: murus-igneus
-Version: 0.3.0~alpha.8
+Version: 0.3.0~alpha.9
 Section: net
 Priority: optional
 Architecture: all
@@ -74,6 +74,6 @@ if [ "${1:-}" = configure ]; then
 fi
 EOF
 chmod 0755 "$stage/DEBIAN/preinst" "$stage/DEBIAN/prerm" "$stage/DEBIAN/postinst"
-dpkg-deb --root-owner-group --build "$stage" "$output/murus-igneus_0.3.0~alpha.8_all.deb"
+dpkg-deb --root-owner-group --build "$stage" "$output/murus-igneus_0.3.0~alpha.9_all.deb"
 
 

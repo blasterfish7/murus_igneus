@@ -354,9 +354,10 @@ class Handler(BaseHTTPRequestHandler):
                         if data.get('confirm') is not True:raise Error('Conferma cancellazione richiesta')
                         self.reply(200,parental.clear_report(STATE))
                     else:self.reply(200,{'csv':parental.reporting.export_csv(parental.reporting.report(STATE,data.get('days',7)))})
-                elif self.path in ('/api/parental/update','/api/parental/pause'):
+                elif self.path in ('/api/parental/update','/api/parental/pause','/api/parental/bonus'):
                     if PENDING or jobs.busy():raise Error('Confermare prima la modifica o attendere la manutenzione')
                     if self.path=='/api/parental/update':self.reply(200,parental.update_feed(STATE,data.get('category')))
+                    elif self.path=='/api/parental/bonus':self.reply(200,parental.bonus(data.get('id'),data.get('minutes')))
                     else:self.reply(200,parental.pause(data.get('id'),data.get('minutes')))
                 elif self.path=='/api/auth/verify':
                     self.mfa_cookie=authentication.authenticate(STATE,data.get('code'),self.client_address[0]);self.reply(200,{'ok':True})
@@ -461,6 +462,10 @@ def main():
         run(['openssl','req','-x509','-newkey','rsa:2048','-sha256','-nodes','-days','3650','-subj','/CN=murus_igneus.local','-keyout',str(key),'-out',str(cert)]);key.chmod(0o600)
     eventlog.start(STATE);parental.reporting.start_retention(STATE)
     make_server('0.0.0.0',8443,cert,key).serve_forever()
+
+
+# Background feed refresh must not overlap pending confirmation or maintenance.
+parental.UPDATE_ALLOWED = lambda: PENDING is None and not jobs.busy()
 
 if __name__=='__main__':
     def terminate(signum,frame):raise SystemExit(0)
