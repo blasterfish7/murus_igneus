@@ -15,7 +15,7 @@ The official Devuan live ISOs include non-free firmware. Therefore, merely
 remastering an unmodified live ISO does not satisfy this project's free-software
 requirement. The Murus builder instead bootstraps a fresh root from signed main
 packages and rejects non-free/contrib and firmware/microcode package names.
-The builder seed is not copied into the target image. Bootstrap uses mmdebstrap with APT's complete native/architecture-independent metadata, the explicit Devuan archive keyring and Excalibur/main from the Devuan merged mirror. Insecure repositories and unauthenticated package installation remain disabled. The resulting root must identify itself as Devuan 6 before installation continues.
+The builder does not remaster the seed filesystem. It uses mmdebstrap/apt with the Devuan archive keyring and mandatory repository/package authentication. Because the current signed archive omits devuan-keyring, that one public trust-anchor package is checked with dpkg verification and repacked from the builder; CI fixes the public Devuan seed by OCI SHA256. No other seed package is copied into the fresh root. The package version, repack digest, seed image and individual keyfile hashes are recorded in bootstrap-provenance.json, included in the ISO and release, and checked again after UEFI boot. The resulting root must identify itself as Devuan 6 before installation continues. All regular OS/application dependencies are installed from signed Excalibur/main sources.
 
 References:
 - https://www.devuan.org/os/releases

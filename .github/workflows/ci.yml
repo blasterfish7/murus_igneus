@@ -146,6 +146,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build signed-main Devuan appliance ISO
+        env:
+          MURUS_BUILD_SEED_IMAGE: dyne/devuan:excalibur@sha256:10f6138df94c08164f300a2f35f96cd8c8966fc4948550dbe0485149d020248f
         run: bash tools/build-devuan-iso.sh
       - name: Install disposable UEFI test tools
         run: apt-get install -y --no-install-recommends qemu-system-x86 ovmf python3-pexpect
@@ -163,6 +165,7 @@ jobs:
             dist/SHA256SUMS
             dist/packages-devuan.tsv
             dist/signature-status.txt
+            dist/bootstrap-provenance.json
             dist/clamav-build.log
             dist/alpha9-iso-networking-qa.json
             dist/alpha9-iso-console.log

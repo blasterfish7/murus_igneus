@@ -461,6 +461,7 @@ def drop_rules(profile, settings, interfaces):
 def schedule_rules(settings, interfaces, overrides, now=None, ready=None, grants=None):
     lines = ['flush chain inet murus_igneus pc_schedule']; rows = []
     stamp = time.time() if now is None else now.timestamp()
+    ipv6_lans = {p['interface'] for p in active_profiles(settings) if p.get('block_ipv6')}
     for p in active_profiles(settings):
         temporary = overrides.get(fingerprint(p), 0)
         failed = ready is not None and not ready.get(p['id'], False)
@@ -470,7 +471,7 @@ def schedule_rules(settings, interfaces, overrides, now=None, ready=None, grants
         reason = 'resolver fermo' if failed else 'pausa' if p['paused'] or temporary > stamp else 'notte' if night and grant <= stamp else 'fuori orario' if grant <= stamp and not in_window(p, settings['timezone'], now) else ''
         rows.append({'id': p['id'], 'name': p['name'], 'blocked': bool(reason), 'reason': reason,
                      'pause_until': temporary if temporary > stamp else None, 'resolver_running': not failed, 'bonus_until': grant if grant > stamp else None,
-                     'study': study, 'devices': copy.deepcopy(p.get('devices', [])), 'ipv6_blocked_lan': p.get('block_ipv6', False)})
+                     'study': study, 'devices': copy.deepcopy(p.get('devices', [])), 'ipv6_blocked_lan': p['interface'] in ipv6_lans})
         if reason:
             lines += drop_rules(p, settings, interfaces)
     return '\n'.join(lines) + '\n', rows

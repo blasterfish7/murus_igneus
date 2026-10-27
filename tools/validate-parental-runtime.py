@@ -223,6 +223,8 @@ for line in sys.stdin:
             unknown=query('allowed.test');ordinary=query('school.blocked.test')
             assert unknown['answers']==0 and ordinary['answers']==0,(unknown,ordinary)
             assert query('www.google.com')['answers']==0
+            for qtype in (28,16):
+                assert query('allowed.test',qtype=qtype)['answers']==0
             active['study_windows']=[];parental.tick()
             assert query('allowed.test')['answers']>0 and query('www.google.com')['ip']=='216.239.38.120'
         ok('Entering study mode switches real DNS to the school allowlist; leaving restores normal filtering and SafeSearch')

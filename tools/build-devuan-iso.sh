@@ -16,16 +16,39 @@ mkdir -p "$work" "$out"
 cp "$project/packaging/devuan/sources.list" /etc/apt/sources.list
 rm -f /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources
 apt-get update
-apt-get install -y --no-install-recommends devuan-keyring mmdebstrap gnupg ca-certificates squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin grub2-common mtools dosfstools python3 xz-utils
-# Use APT's complete architecture metadata, including Devuan's binary-all index.
-# The bootstrap archive is always Excalibur/main and authentication stays mandatory.
+apt-get install -y --no-install-recommends devuan-keyring mmdebstrap dpkg-repack gnupg ca-certificates squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin grub2-common mtools dosfstools python3 xz-utils
+# Bootstrap a fresh root with signed APT metadata. The archive currently omits
+# devuan-keyring: export only that verified trust package from the public builder.
 bootstrap_keyring=/usr/share/keyrings/devuan-archive-keyring.gpg
 [[ -r $bootstrap_keyring ]] || { echo 'Missing Devuan archive keyring'; exit 1; }
+trust_check=$(dpkg --verify devuan-keyring)
+[[ -z $trust_check ]] || { printf '%s\n' "$trust_check"; echo 'Modified Devuan trust package'; exit 1; }
+mkdir -p "$work/trust"
+(cd "$work/trust" && dpkg-repack devuan-keyring)
+trust_packages=("$work/trust"/devuan-keyring_*.deb)
+[[ ${#trust_packages[@]} == 1 && -f ${trust_packages[0]} ]] || { echo 'Missing unique Devuan trust package'; exit 1; }
 mmdebstrap --mode=root --format=directory --variant=minbase --architectures=amd64 \
-    --keyring="$bootstrap_keyring" --include=apt,devuan-keyring \
+    --keyring="$bootstrap_keyring" --include=apt \
     --aptopt='Acquire::AllowInsecureRepositories "false"' \
     --aptopt='APT::Get::AllowUnauthenticated "false"' \
-    excalibur "$root" 'deb http://deb.devuan.org/merged excalibur main'
+    excalibur "$root" "$project/packaging/devuan/sources.list"
+cp "${trust_packages[0]}" "$root/tmp/murus-bootstrap-trust.deb"
+chroot "$root" dpkg -i /tmp/murus-bootstrap-trust.deb
+rm "$root/tmp/murus-bootstrap-trust.deb"
+python3 - "${trust_packages[0]}" "$out/bootstrap-provenance.json" <<'TRUST'
+import hashlib,json,os,subprocess,sys
+from pathlib import Path
+package=Path(sys.argv[1])
+files={}
+for name in subprocess.check_output(['dpkg-query','-L','devuan-keyring'],text=True).splitlines():
+    if name.endswith('.gpg') and Path(name).is_file():
+        files[name]=hashlib.sha256(Path(name).read_bytes()).hexdigest()
+record={'package':'devuan-keyring','version':subprocess.check_output(['dpkg-query','-W','-f=${Version}','devuan-keyring'],text=True),
+        'seed_image':os.environ.get('MURUS_BUILD_SEED_IMAGE','external Devuan builder; record its provenance separately'),
+        'verified_installed_files':True,'repacked_sha256':hashlib.sha256(package.read_bytes()).hexdigest(),
+        'keyfiles_sha256':files,'scope':'Only the archive trust-anchor package is exported from the builder; the fresh root uses authenticated Devuan Excalibur main repositories.'}
+Path(sys.argv[2]).write_text(json.dumps(record,indent=2)+'\n')
+TRUST
 chroot "$root" sh -ec '. /etc/os-release; test "$ID" = devuan; case "$VERSION_ID" in 6|6.*) ;; *) exit 1;; esac'
 cleanup() {
     mountpoint -q "$root/dev" && umount -R "$root/dev" || true
@@ -33,6 +56,7 @@ cleanup() {
     mountpoint -q "$root/sys" && umount -R "$root/sys" || true
 }
 trap cleanup EXIT
+rm -f "$root"/etc/apt/sources.list.d/*.list "$root"/etc/apt/sources.list.d/*.sources
 cp "$project/packaging/devuan/sources.list" "$root/etc/apt/sources.list"
 cp /etc/resolv.conf "$root/etc/resolv.conf"
 cat > "$root/usr/sbin/policy-rc.d" <<'POLICY'
@@ -50,6 +74,7 @@ bash "$project/packaging/devuan/build-deb.sh" "$out"
 cp "$out/murus-igneus_0.3.0~alpha.9_all.deb" "$root/tmp/murus.deb"
 chroot "$root" dpkg -i /tmp/murus.deb
 rm "$root/tmp/murus.deb"
+cp "$out/bootstrap-provenance.json" "$root/usr/share/doc/murus-igneus/bootstrap-provenance.json"
 # A signed ClamAV database can be distributed with the lab ISO when its official
 # download is available. An unavailable upstream must not be reported as coverage.
 if [[ ${MURUS_FETCH_SIGNATURES:-1} == 1 ]]; then

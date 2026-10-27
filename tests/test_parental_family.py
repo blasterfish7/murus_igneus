@@ -112,6 +112,10 @@ class FamilyTests(unittest.TestCase):
         for chain,direction in [('pc_forward','iifname'),('pc_forward','oifname'),('pc_input','iifname'),('pc_output','oifname')]:
             self.assertIn(f'insert rule inet murus_igneus {chain} {direction} "lan0" meta nfproto ipv6 counter drop',text)
         self.assertNotIn('iifname "wan0" meta nfproto ipv6 counter drop',text)
+        self.c['parental']['profiles'].append({**self.c['parental']['profiles'][0], 'id':2, 'clients':['10.60.0.11'], 'block_ipv6':False})
+        plan=compile_config(self.c)['parental']
+        _, rows=parental.schedule_rules(plan['settings'],plan['interfaces'],{},ready={1:True,2:True})
+        self.assertTrue(all(r['ipv6_blocked_lan'] for r in rows))
 
     def test_proxy_does_not_bypass_school_or_safesearch_vips(self):
         self.p.update(study_domains=['school.test'], safe_search=True)

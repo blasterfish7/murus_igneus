@@ -44,6 +44,22 @@ with tempfile.TemporaryDirectory(prefix='murus-iso-qa-') as work:
                 raise RuntimeError('Guest command failed: ' + output[-5000:])
             return output
 
+        trust_probe = """import hashlib,json,subprocess
+from pathlib import Path
+p=json.loads(Path('/usr/share/doc/murus-igneus/bootstrap-provenance.json').read_text())
+assert p['package']=='devuan-keyring' and p['verified_installed_files'] is True
+assert p['seed_image']=='dyne/devuan:excalibur@sha256:10f6138df94c08164f300a2f35f96cd8c8966fc4948550dbe0485149d020248f'
+assert subprocess.check_output(['dpkg-query','-W','-f=${Version}','devuan-keyring'],text=True)==p['version']
+assert p['keyfiles_sha256']
+for name,digest in p['keyfiles_sha256'].items():
+ assert name.startswith(('/usr/share/keyrings/devuan','/etc/apt/trusted.gpg.d/devuan')) and name.endswith('.gpg')
+ assert hashlib.sha256(Path(name).read_bytes()).hexdigest()==digest,name
+print('Installed Devuan trust anchors verified')
+"""
+        payload = base64.b64encode(gzip.compress(trust_probe.encode())).decode()
+        command("python3 -c \"import base64,gzip;exec(gzip.decompress(base64.b64decode('" + payload + "')))\"")
+        checks.append('Installed Devuan archive trust package and keyfiles match the recorded public builder provenance'); print('PASS ' + checks[-1],flush=True)
+
         # Read the real HTTPS backend, then preview a complete native VLAN plan.
         probe = '''import base64,http.client,json,ssl,time,urllib.request
 opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),urllib.request.HTTPSHandler(context=ssl._create_unverified_context()))
