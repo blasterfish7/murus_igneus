@@ -1,3 +1,13 @@
+# Published release — 0.3.0-alpha.8
+
+PRs #9 and #10 are merged into main. Historical draft PRs #1/#4 are closed with branches preserved. [Download alpha.8](https://github.com/blasterfish7/murus_igneus/releases/tag/v0.3.0-alpha.8): original tested ISO, DEB, guide, checksums and acceptance report. Earlier releases are preserved.
+Tag target: `4d4c70081973b0f0a1b4c00bb27ee7548a3b3ab3`; tested combined source: `bf328cc0dfff2d4a3877004d14f16aa6d1ab8e98`. Only QA documentation differs at the release target. [Publisher run 40506192010](https://github.com/blasterfish7/murus_igneus/actions/runs/40506192010) verified original ISO/DEB hashes, the 46-check ISO report, all 27 application files and installed scripts, and all nine asset digests before publishing.
+
+ISO SHA256: `ffc6778201699ebf5a4677be7a7d986f0a1f66bbdce393ce64a8c58c4a5a0972`.
+DEB SHA256: `554be9fce716be5b1ba3076b0cdeaabc5c10b88c853b4dee380a930838f4c6e8`.
+
+See [ALPHA8](docs/ALPHA8.md), [ISO QA](docs/ISO-ALPHA8-QA.md) and [parental/reporting](docs/PARENTAL.md) for setup, verification and limitations.
+
 # Alpha.8 acceptance — 2026-10-27 UTC
 
 Tested combined source: `bf328cc0dfff2d4a3877004d14f16aa6d1ab8e98`.
@@ -8,7 +18,7 @@ Includes PR9 responsive status snapshots and PR10 corrected to verify network po
 ISO: `murus-igneus-0.3.0-alpha.8-devuan-amd64.iso`, 475123712 bytes, SHA256 `ffc6778201699ebf5a4677be7a7d986f0a1f66bbdce393ce64a8c58c4a5a0972`.
 DEB: 101916 bytes, SHA256 `554be9fce716be5b1ba3076b0cdeaabc5c10b88c853b4dee380a930838f4c6e8`.
 
-Original tested artifacts preserved in a private draft; final publication pending. Details: [ALPHA8](docs/ALPHA8.md), [ISO QA](docs/ISO-ALPHA8-QA.md), [structured summary](docs/qa/alpha8-validation.json). No new disk installation, hardware/Secure Boot or complete UTM efficacy claim. No Fortinet code/firmware.
+Original tested artifacts preserved in a draft and published without rebuilding. The publisher verified all 27 application files, installed scripts and all nine release asset digests. Details: [ALPHA8](docs/ALPHA8.md), [ISO QA](docs/ISO-ALPHA8-QA.md), [structured summary](docs/qa/alpha8-validation.json). No new disk installation, hardware/Secure Boot or complete UTM efficacy claim. No Fortinet code/firmware.
 
 ---
 
