@@ -160,6 +160,16 @@ print(json.dumps({'address':socket.inet_ntoa(ack[16:20]),'gateway':socket.inet_n
         dns('milan', '198.51.100.1'); ok('Unconfirmed publication removal rolls back automatically after 90 seconds, including DNS')
         saved = json.loads((server.STATE / 'active.json').read_text()); assert saved['configuration']['dns'] == config['dns']
         assert saved['configuration']['interfaces'][2]['vlan_id'] == 20; ok('Confirmed native settings persisted in active.json')
+        # Exercise an actual nft parser failure during recovery; forwarding must stay closed.
+        ident = apply(disabled, confirm=False)
+        with server.LOCK:
+            server.PENDING['old'] = 'invalid nft rollback fixture\n'
+            server.rollback(ident)
+        assert server.PENDING is None and 'Ripristino servizi fallito' in server.LAST, server.LAST
+        assert 'error' in http(), 'Incomplete recovery unexpectedly allowed forwarded traffic'
+        rules = run(['nft', 'list', 'table', 'inet', 'murus_igneus'])
+        assert 'policy drop' in rules and 'tcp dport 8443 accept' in rules, rules
+        ok('Actual invalid nft restore releases the pending transaction and leaves management access with transit blocked')
         result = {'success': True, 'checks': checks, 'scope': 'Isolated Linux namespace with real nftables, veth VLAN, dnsmasq, DHCP packets, DNS and TCP traffic; not ISO/hardware acceptance.'}
         target = ROOT / 'dist/native-networking-qa.json'; target.parent.mkdir(exist_ok=True); target.write_text(json.dumps(result, indent=2) + '\n')
     finally:

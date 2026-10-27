@@ -13,7 +13,7 @@ import pexpect
 
 ROOT = Path(__file__).resolve().parents[1]
 assert os.environ.get('MURUS_LAB') == 'YES', 'Explicit disposable VM flag required'
-iso = ROOT / 'dist/murus-igneus-0.3.0-alpha.6-devuan-amd64.iso'
+iso = ROOT / 'dist/murus-igneus-0.3.0-alpha.7-devuan-amd64.iso'
 assert iso.is_file()
 firmware = Path('/usr/share/OVMF')
 code = firmware / 'OVMF_CODE_4M.fd'; template = firmware / 'OVMF_VARS_4M.fd'
@@ -27,7 +27,7 @@ with tempfile.TemporaryDirectory(prefix='murus-iso-qa-') as work:
     for index in range(3):
         args += ['-netdev', f'user,id=n{index}', '-device', f'virtio-net-pci,netdev=n{index},romfile=']
     child = pexpect.spawn(args[0], args[1:], encoding='utf-8', timeout=360)
-    log = (ROOT / 'dist/alpha6-iso-console.log').open('w'); child.logfile = log
+    log = (ROOT / 'dist/alpha7-iso-console.log').open('w'); child.logfile = log
     try:
         child.expect(r'login:'); child.sendline('root'); child.expect('Password:'); child.sendline('igneus')
         child.expect(r'root@[^\r\n]*[#$] ')
@@ -45,7 +45,7 @@ with tempfile.TemporaryDirectory(prefix='murus-iso-qa-') as work:
             return output
 
         # Read the real HTTPS backend, then preview a complete native VLAN plan.
-        probe = '''import base64,json,ssl,time,urllib.request
+        probe = '''import base64,http.client,json,ssl,time,urllib.request
 opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),urllib.request.HTTPSHandler(context=ssl._create_unverified_context()))
 def api(path,data=None):
  h={'Authorization':'Basic '+base64.b64encode(b'admin:igneus').decode()}
@@ -56,12 +56,21 @@ for i in range(60):
  try:s=api('status');break
  except OSError:time.sleep(2)
 else:raise AssertionError('HTTPS backend not ready')
-assert s['version']=='0.3.0-alpha.6',s
+assert s['version']=='0.3.0-alpha.7',s
+# A separate loopback source verifies the real TLS/Basic gate without locking out the QA client.
+def auth_probe(password):
+ conn=http.client.HTTPSConnection('127.0.0.1',8443,context=ssl._create_unverified_context(),source_address=('127.0.0.2',0),timeout=10)
+ header='Basic '+base64.b64encode(('admin:'+password).encode()).decode()
+ conn.request('GET','/api/status',headers={'Authorization':header});r=conn.getresponse();result=(r.status,r.getheader('Retry-After'));r.read();conn.close();return result
+for attempt in range(10):assert auth_probe('controlled-incorrect-password')[0]==401
+assert auth_probe('igneus')==(429,'60')
+assert api('status')['version']=='0.3.0-alpha.7'
+print('ISO_HTTPS_BASIC_THROTTLE_OK')
 csrf=s['csrf'];c=api('configuration')['configuration'];assert 'dns' in c and 'dhcp' in c and 'port_forwards' in c,c
 c['interfaces']=[{'name':'TRUNK','device':'eth2','address':''},{'name':'LAN','device':'eth2.20','address':'198.51.100.1/24','parent':'eth2','vlan_id':20}]
 p=api('configuration/preview',{'configuration':c});assert p['ready'],p
 assert p['network_ops'][0]['kind']=='vlan',p
-print('ISO_HTTPS_ALPHA6_NATIVE_VLAN_PREVIEW_OK')
+print('ISO_HTTPS_ALPHA7_NATIVE_VLAN_PREVIEW_OK')
 c=api('configuration')['configuration']
 c['interfaces']=[{'name':'WAN','device':'eth1','address':'198.18.0.1/24'},{'name':'LAN','device':'eth2','address':'10.80.1.1/24'}]
 c['ipsec']=[{'id':1,'enabled':True,'public_device':'eth1','remote_ip':'198.18.0.2','local_id':'iso-local','remote_id':'iso-remote','local_network':'10.80.1.0/24','remote_network':'10.80.2.0/24','psk':'LabOnlyRootServiceSecret123456'}]
@@ -87,7 +96,8 @@ print('ISO_ROOT_PARENTAL_APPLY_ROLLBACK_OK')
 '''
         encoded = base64.b64encode(probe.encode()).decode()
         command("python3 -c \"import base64;exec(base64.b64decode('" + encoded + "'))\"")
-        checks.append('Real HTTPS backend alpha.6, empty setup and native VLAN preview'); print('PASS ' + checks[-1], flush=True)
+        checks.append('Real HTTPS authentication rejects ten wrong passwords, throttles further credentials and isolates peers'); print('PASS ' + checks[-1], flush=True)
+        checks.append('Real HTTPS backend alpha.7, empty setup and native VLAN preview'); print('PASS ' + checks[-1], flush=True)
         checks.append('Real appliance HTTPS preview/apply starts owned strongSwan and rollback stops it'); print('PASS ' + checks[-1], flush=True)
         checks.append('Real appliance HTTPS parental apply starts resolver and rollback stops it'); print('PASS ' + checks[-1], flush=True)
         command('mkdir -p /tmp/murus-qa/tools /tmp/murus-qa/src && cp -a /usr/lib/murus-igneus /tmp/murus-qa/src/murus_igneus')
@@ -98,7 +108,7 @@ print('ISO_ROOT_PARENTAL_APPLY_ROLLBACK_OK')
         command("python3 -c \"import base64,gzip;from pathlib import Path;Path('/tmp/murus-qa/tools/validate-native-networking.py').write_bytes(gzip.decompress(base64.b64decode(Path('/tmp/murus-qa/runtime.b64').read_bytes())))\"")
         output = command('MURUS_LAB=YES unshare --mount --net --fork python3 /tmp/murus-qa/tools/validate-native-networking.py', timeout=360)
         runtime = json.loads(re.search(r'MIQA_JSON=(\{[^\r\n]+\})', command("python3 -c \"import json;print('MIQA_JSON='+json.dumps(json.load(open('/tmp/murus-qa/dist/native-networking-qa.json'))))\"")).group(1))
-        assert runtime['success'], output
+        assert runtime['success'] and len(runtime['checks']) == 12, output
         checks += ['Devuan ISO: ' + item for item in runtime['checks']]
         print('PASS real packet suite on original ISO: ' + str(len(runtime['checks'])) + ' checks', flush=True)
         payload = base64.b64encode(gzip.compress((ROOT / 'tools/validate-enterprise-runtime.py').read_bytes())).decode()
@@ -126,7 +136,7 @@ print('ISO_ROOT_PARENTAL_APPLY_ROLLBACK_OK')
         with iso.open('rb') as file:
             digest = hashlib.file_digest(file, 'sha256').hexdigest()
         result = {'success': True, 'checks': checks, 'iso': iso.name, 'sha256': digest, 'scope': 'QEMU TCG UEFI live boot; installed product modules exercised with real packets inside isolated guest namespaces. No disk installation, Secure Boot or physical hardware test.'}
-        (ROOT / 'dist/alpha6-iso-networking-qa.json').write_text(json.dumps(result, indent=2) + '\n')
+        (ROOT / 'dist/alpha7-iso-networking-qa.json').write_text(json.dumps(result, indent=2) + '\n')
     finally:
         if child.isalive():
             child.terminate(force=True)
