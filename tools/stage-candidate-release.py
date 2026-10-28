@@ -18,7 +18,7 @@ sys.path.insert(0,str(ROOT/'src/murus_igneus'))
 from migration import VERSION
 assert re.fullmatch(r'0\.3\.0-alpha\.[0-9]+',VERSION)
 LABEL=VERSION.removeprefix('0.3.0-').replace('.','')
-ISO_CHECKS=46
+ISO_CHECKS=58
 API = 'https://api.github.com/repos/' + REPO
 
 
@@ -41,7 +41,7 @@ with iso.open('rb') as f:
 assert qa['iso'] == iso.name and qa['sha256'] == digest
 assert (out / 'SHA256SUMS').read_text().strip() == digest + '  ' + iso.name
 files = [iso, out / ('murus-igneus_'+VERSION.replace('-','~',1)+'_all.deb'), out / (LABEL+'-iso-networking-qa.json'),
-         out / 'SHA256SUMS', out / 'packages-devuan.tsv', out / 'signature-status.txt']
+         out / 'SHA256SUMS', out / 'packages-devuan.tsv', out / 'signature-status.txt', out / 'bootstrap-provenance.json']
 manifest = {'source_sha': SHA, 'run_id': RUN, 'iso_checks': ISO_CHECKS, 'files': {}}
 for file in files:
     assert file.is_file() and file.stat().st_size > 0

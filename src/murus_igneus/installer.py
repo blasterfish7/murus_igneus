@@ -1,5 +1,5 @@
 """Explicitly confirmed live-to-disk installer. SPDX-License-Identifier: MIT."""
-import json,re,secrets,subprocess,tempfile,time
+import argparse,fcntl,json,os,re,secrets,subprocess,sys,tempfile,time
 from pathlib import Path
 try:
     from .migration import Error
@@ -10,6 +10,7 @@ try:
 except ImportError:
     import jobs
 PREVIEW=None
+INSTALL_LOCK=Path('/run/murus-igneus-installer.lock')
 
 def command(args):return subprocess.check_output(args,text=True,timeout=20)
 def live():return Path('/etc/murus_igneus/live-image').exists() and Path('/run/live/medium/live/filesystem.squashfs').is_file()
@@ -24,7 +25,7 @@ def inventory():
         seq=Path('/sys/class/block/'+d['name']+'/diskseq')
         identity=d['maj:min']+':'+(seq.read_text().strip() if seq.exists() else 'unknown')
         disks.append({'path':d['path'],'bytes':int(d['size']),'model':(d.get('model') or '').strip(),'identity':identity})
-    return {'live':True,'disks':disks,'message':'Il disco selezionato verrà cancellato interamente. Minimo 8 GiB.'}
+    return {'live':True,'disks':disks,'message':'Il disco selezionato verrà cancellato interamente. Minimo 8 GiB.' if disks else 'Nessun disco installabile: collega un disco non montato di almeno 8 GiB; nella VM aggiungi un disco virtuale.'}
 
 def preview(path):
     global PREVIEW
@@ -43,6 +44,16 @@ def start(data):
     return jobs.start('Installazione su '+current['path'],lambda log:install(current,log))
 
 def install(disk,log):
+    # Serialize console and web installers across processes, before any disk write.
+    fd=os.open(INSTALL_LOCK,os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
+    try:
+        try:fcntl.flock(fd,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except BlockingIOError:raise Error('Un’altra installazione è già in corso') from None
+        _install(disk,log)
+    finally:os.close(fd)
+
+
+def _install(disk,log):
     # Revalidate immediately before the first destructive write.
     if disk not in inventory()['disks']:raise Error('Disco non più disponibile')
     path=disk['path'];part=lambda n:path+('p' if path[-1].isdigit() else '')+str(n)
@@ -80,3 +91,34 @@ def install(disk,log):
             subprocess.run(['umount','-R',where],stdout=log,stderr=subprocess.STDOUT,timeout=30)
 
 
+
+
+def console_main(argv=None, read=None, log=None):
+    parser=argparse.ArgumentParser(description='Installa Murus Igneus dalla live su un disco vuoto selezionato. Il disco viene cancellato solo dopo conferma esplicita.')
+    parser.add_argument('--list',action='store_true',help='Mostra i dischi installabili senza modificarli')
+    parser.add_argument('--disk',help='Disco da proporre; richiede sempre conferma interattiva')
+    args=parser.parse_args(argv);out=log or sys.stdout;read=read or input
+    if os.geteuid()!=0:
+        print('Eseguire dalla console come root.',file=out);return 1
+    data=inventory();print(data['message'],file=out)
+    for index,disk in enumerate(data['disks'],1):
+        print(f"{index}. {disk['path']} · {disk['bytes']/1024**3:.1f} GiB · {disk['model']}",file=out)
+    if args.list:return 0 if data['live'] else 1
+    if not data['live'] or not data['disks']:return 1
+    if not sys.stdin.isatty():
+        print('Installazione consentita solo da console interattiva; nessuna opzione di conferma automatica.',file=out);return 1
+    try:
+        choice=args.disk or read('Numero del disco (Invio per annullare): ').strip()
+        if not choice:return 2
+        disk=next((d for i,d in enumerate(data['disks'],1) if choice in (str(i),d['path'])),None)
+        if disk is None:raise Error('Disco non presente tra le destinazioni installabili')
+        confirmation='CANCELLA '+disk['path']
+        print('TUTTI I DATI SU '+disk['path']+' SARANNO CANCELLATI. Per proseguire scrivi esattamente: '+confirmation,file=out,flush=True)
+        if read('Conferma (Invio per annullare): ').strip()!=confirmation:
+            print('Installazione annullata. Nessun disco modificato.',file=out);return 2
+        install(disk,out)
+        return 0
+    except (EOFError,KeyboardInterrupt):
+        print('Installazione annullata.',file=out);return 2
+    except Exception as exc:
+        print('ERRORE: '+str(exc),file=out);return 1

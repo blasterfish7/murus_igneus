@@ -51,11 +51,15 @@ BLOCKED = {}
 RUNTIME = {'running': False, 'profiles': [], 'error': ''}
 LAST_RULES = None
 REPORTER = None
+DNS_MODES = {}
+MANAGEMENT = 'eth0'
+AUTO_NEXT = 0
+AUTO_STATUS = {'last_success': None, 'error': ''}
 
 
 def defaults():
     return {'parental': {'enabled': False, 'timezone': 'Europe/Rome',
-                         'upstream_servers': ['1.1.1.1', '9.9.9.9'], 'profiles': [], 'reporting': False}}
+                         'upstream_servers': ['1.1.1.1', '9.9.9.9'], 'profiles': [], 'reporting': False, 'auto_update': False}}
 
 
 def fields(value, allowed):
@@ -100,8 +104,9 @@ def minute(value):
 def validate(config, management='eth0'):
     settings = copy.deepcopy(config.get('parental', defaults()['parental']))
     settings.setdefault('reporting', False)
-    fields(settings, 'enabled timezone upstream_servers profiles reporting')
-    if set(settings) != set(defaults()['parental']) or type(settings['enabled']) is not bool or type(settings['reporting']) is not bool:
+    settings.setdefault('auto_update', False)
+    fields(settings, 'enabled timezone upstream_servers profiles reporting auto_update')
+    if set(settings) != set(defaults()['parental']) or type(settings['enabled']) is not bool or type(settings['reporting']) is not bool or type(settings['auto_update']) is not bool:
         raise Error('Configurazione parental control incompleta')
     if not isinstance(settings['timezone'], str) or len(settings['timezone']) > 80:
         raise Error('Fuso orario non valido')
@@ -123,14 +128,18 @@ def validate(config, management='eth0'):
         raise Error('Massimo 8 profili parental')
     ids = set(); used = []
     for row in profiles:
-        fields(row, 'id name enabled interface clients categories services blocked_domains allowed_domains windows paused enforce_dns block_quic')
-        required = set('id name enabled interface clients categories services blocked_domains allowed_domains windows paused enforce_dns block_quic'.split())
+        if not isinstance(row, dict):
+            raise Error('Profilo parental non valido')
+        for key, value in {'devices': [], 'safe_search': False, 'youtube_restricted': 'off', 'study_windows': [], 'study_domains': [], 'night_windows': [], 'block_ipv6': False}.items():
+            row.setdefault(key, value)
+        fields(row, 'id name enabled interface clients categories services blocked_domains allowed_domains windows paused enforce_dns block_quic devices safe_search youtube_restricted study_windows study_domains night_windows block_ipv6')
+        required = set('id name enabled interface clients categories services blocked_domains allowed_domains windows paused enforce_dns block_quic devices safe_search youtube_restricted study_windows study_domains night_windows block_ipv6'.split())
         if set(row) != required or type(row['id']) is not int or not 1 <= row['id'] <= 8 or row['id'] in ids:
             raise Error('Profilo incompleto o ID non univoco (1–8)')
         ids.add(row['id'])
         if not isinstance(row['name'], str) or not row['name'].strip() or len(row['name']) > 80 or any(ord(c) < 32 for c in row['name']):
             raise Error('Nome profilo non valido')
-        if any(type(row[k]) is not bool for k in ('enabled', 'paused', 'enforce_dns', 'block_quic')):
+        if any(type(row[k]) is not bool for k in ('enabled', 'paused', 'enforce_dns', 'block_quic', 'safe_search', 'block_ipv6')):
             raise Error('Abilitazione parental non valida')
         port = ports.get(row['interface'])
         if not port or not port.get('address') or port['device'] in (management, 'lo', security.WG):
@@ -151,15 +160,39 @@ def validate(config, management='eth0'):
             if not isinstance(row[key], list) or not all(isinstance(v, str) and v in known for v in row[key]) or len(set(row[key])) != len(row[key]):
                 raise Error('Categoria o servizio parental non valido')
         row['blocked_domains'] = names(row['blocked_domains']); row['allowed_domains'] = names(row['allowed_domains'])
-        if not isinstance(row['windows'], list) or len(row['windows']) > 28:
-            raise Error('Massimo 28 fasce orarie per profilo')
-        for window in row['windows']:
-            fields(window, 'days start end')
-            if set(window) != {'days', 'start', 'end'} or not isinstance(window['days'], list) or not window['days'] or any(type(d) is not int or not 0 <= d <= 6 for d in window['days']):
-                raise Error('Giorni: lunedì=0, domenica=6')
-            if minute(window['start']) == minute(window['end']):
-                raise Error('Una fascia deve avere orari diversi; nessuna fascia significa accesso senza limite orario')
+        for key in ('windows', 'study_windows', 'night_windows'):
+            validate_windows(row[key])
+        if row['youtube_restricted'] not in ('off', 'strict', 'moderate'):
+            raise Error('Modalità YouTube non valida')
+        row['study_domains'] = names(row['study_domains'])
+        if row['study_windows'] and (not row['study_domains'] or not row['enforce_dns']):
+            raise Error('La modalità compiti richiede domini scolastici e DNS forzato')
+        if (row['safe_search'] or row['youtube_restricted'] != 'off') and not row['enforce_dns']:
+            raise Error('SafeSearch e YouTube con restrizioni richiedono DNS forzato')
+        devices = row['devices']
+        if not isinstance(devices, list) or len(devices) > 64:
+            raise Error('Massimo 64 nomi di dispositivi per figlio')
+        addresses = set()
+        for device in devices:
+            fields(device, 'address name')
+            if set(device) != {'address', 'name'} or not isinstance(device['name'], str) or not device['name'].strip() or len(device['name']) > 80 or any(ord(c) < 32 for c in device['name']):
+                raise Error('Nome dispositivo non valido')
+            device['address'] = str(ip.IPv4Address(device['address']))
+            if device['address'] in addresses or str(ip.IPv4Network(device['address'] + '/32')) not in row['clients']:
+                raise Error('Il dispositivo deve avere un IPv4 singolo presente nel profilo, senza duplicati')
+            addresses.add(device['address'])
     return settings
+
+
+def validate_windows(windows):
+    if not isinstance(windows, list) or len(windows) > 28:
+        raise Error('Massimo 28 fasce orarie per modalità')
+    for window in windows:
+        fields(window, 'days start end')
+        if set(window) != {'days', 'start', 'end'} or not isinstance(window['days'], list) or not window['days'] or any(type(d) is not int or not 0 <= d <= 6 for d in window['days']):
+            raise Error('Giorni: lunedì=0, domenica=6')
+        if minute(window['start']) == minute(window['end']):
+            raise Error('Una fascia deve avere orari diversi')
 
 
 def active_profiles(settings):
@@ -186,6 +219,10 @@ def decorate(plan, settings, interfaces):
              'add rule inet murus_igneus pc_output jump pc_schedule',
              'add chain inet murus_igneus pc_dns { type nat hook prerouting priority -110; policy accept; }']
     lines += reporting.rules(settings, interfaces)
+    for device in sorted({ports[p['interface']]['device'] for p in profiles if p.get('block_ipv6')}):
+        for chain, direction in [('pc_forward', 'iifname'), ('pc_forward', 'oifname'), ('pc_input', 'iifname'), ('pc_output', 'oifname')]:
+            lines.append(f'insert rule inet murus_igneus {chain} {direction} {json.dumps(device)} meta nfproto ipv6 counter drop comment "parental IPv6 LAN"')
+    plan['warnings'].append('Parental IPv6: nessun filtro per dispositivo. Il blocco IPv6 opzionale copre tutta la LAN scelta, incluso accesso al firewall; non copre percorsi alternativi sullo stesso segmento.')
     for row in profiles:
         dev = json.dumps(ports[row['interface']]['device']); clients = '{ ' + ', '.join(row['clients']) + ' }'; port = 12000 + row['id']
         # Start closed. Evaluate local time after all services start.
@@ -235,28 +272,42 @@ def parse_feed(raw):
     return sorted(values)
 
 
+def download_feed(category):
+    if category not in FEEDS:
+        raise Error('Categoria non valida')
+    conn = http.client.HTTPSConnection('raw.githubusercontent.com', timeout=30)
+    path = '/hagezi/dns-blocklists/main/wildcard/' + FEEDS[category][1]
+    try:
+        conn.request('GET', path, headers={'User-Agent': 'Murus-Igneus-parental'})
+        response = conn.getresponse()
+        if response.status != 200:
+            raise Error('Download lista HTTP ' + str(response.status))
+        raw = response.read(MAX_FEED_BYTES + 1)
+    finally:
+        conn.close()
+    values = parse_feed(raw)
+    return {'category': category, 'domains': values, 'updated': time.time(),
+            'source': 'https://raw.githubusercontent.com' + path, 'license': 'GPL-3.0',
+            'sha256': hashlib.sha256(raw).hexdigest()}
+
+
+def save_feed(state, category, payload):
+    target = feed_path(category, state)
+    if target.exists():
+        security.write(target.with_suffix('.previous.json'), target.read_text())
+    security.write(target, json.dumps(payload))
+
+
 def update_feed(state, category):
     if category not in FEEDS:
         raise Error('Categoria non valida')
     def action():
-        conn = http.client.HTTPSConnection('raw.githubusercontent.com', timeout=30)
-        path = '/hagezi/dns-blocklists/main/wildcard/' + FEEDS[category][1]
-        try:
-            conn.request('GET', path, headers={'User-Agent': 'Murus-Igneus-parental'})
-            response = conn.getresponse()
-            if response.status != 200:
-                raise Error('Download lista HTTP ' + str(response.status))
-            raw = response.read(MAX_FEED_BYTES + 1)
-        finally:
-            conn.close()
-        values = parse_feed(raw)
-        payload = {'category': category, 'domains': values, 'updated': time.time(),
-                   'source': 'https://raw.githubusercontent.com' + path, 'license': 'GPL-3.0',
-                   'sha256': hashlib.sha256(raw).hexdigest()}
-        target = feed_path(category, state)
-        security.write(target, json.dumps(payload))
-        return {'category': category, 'domains': len(values), 'message': 'Lista aggiornata. Verifica e riapplica la bozza per usarla nei profili.'}
-    return TASK.start(action)
+        payload = download_feed(category)
+        with LOCK:
+            save_feed(state, category, payload)
+        return {'category': category, 'domains': len(payload['domains']), 'message': 'Lista aggiornata. Verifica e riapplica la bozza per usarla nei profili.'}
+    with LOCK:
+        return TASK.start(action)
 
 
 def load_domains(settings, state):
@@ -275,7 +326,7 @@ def matches(host, values):
     return any('.'.join(labels[i:]) in values for i in range(len(labels)))
 
 
-def dns_config(profile, settings, interface, feeds, management):
+def dns_config(profile, settings, interface, feeds, management, study=False):
     blocked = set(profile['blocked_domains'])
     for category in profile['categories']:
         blocked.update(feeds[category])
@@ -302,7 +353,44 @@ def dns_config(profile, settings, interface, feeds, management):
         if profile['enforce_dns'] and any(value == d or value.endswith('.' + d) or d.endswith('.' + value) for d in ENCRYPTED_DNS):
             raise Error('Un’eccezione non può riabilitare un resolver cifrato noto mentre DNS forzato è attivo')
         lines += ['server=/' + value + '/' + upstream for upstream in settings['upstream_servers']]
+    if study:
+        lines += ['address=/#/']
+        # During study even ordinary allow exceptions cannot widen the school allowlist.
+        # No default upstream in study mode: unmatched queries must never fall through.
+        lines = [line for line in lines if not line.startswith('server=')]
+        for value in profile.get('study_domains', []):
+            if not matches(value, blocked) and not (profile['enforce_dns'] and matches(value, set(ENCRYPTED_DNS))):
+                lines += ['server=/' + value + '/' + upstream for upstream in settings['upstream_servers']]
+    lines += safe_dns(profile, blocked, study)
     return '\n'.join(lines) + '\n'
+
+
+# Explicit provider VIPs; no HTTPS interception. See docs/PARENTAL.md for source/scope.
+GOOGLE_HOSTS = ('www.google.com', 'www.google.it', 'www.google.co.uk', 'www.google.fr', 'www.google.de', 'www.google.es')
+YOUTUBE_HOSTS = ('www.youtube.com', 'm.youtube.com', 'youtubei.googleapis.com', 'youtube.googleapis.com', 'www.youtube-nocookie.com')
+
+
+def safe_dns(profile, blocked, study):
+    groups = []
+    if profile.get('safe_search'):
+        groups.append(('forcesafesearch.google.com', '216.239.38.120', GOOGLE_HOSTS))
+    mode = profile.get('youtube_restricted', 'off')
+    if mode != 'off':
+        groups.append(('restrict.youtube.com' if mode == 'strict' else 'restrictmoderate.youtube.com',
+                       '216.239.38.120' if mode == 'strict' else '216.239.38.119', YOUTUBE_HOSTS))
+    lines = []
+    for target, address, hosts in groups:
+        permitted = [host for host in hosts if (not matches(host, blocked) or matches(host, set(profile['allowed_domains']))) and (not study or matches(host, set(profile.get('study_domains', []))))]
+        if permitted:
+            lines += ['host-record=' + target + ',' + address]
+            for host in permitted:
+                lines += ['cname=' + host + ',' + target, 'local=/' + host + '/']
+    return lines
+
+
+def in_mode(profile, key, timezone, now=None):
+    windows = profile.get(key, [])
+    return bool(windows) and in_window({'windows': windows}, timezone, now)
 
 
 def in_window(profile, timezone, now=None):
@@ -329,6 +417,33 @@ def pauses(state):
     return json.loads(path.read_text()) if path.exists() else {}
 
 
+def bonus_key(profile):
+    return hashlib.sha256(json.dumps(profile, sort_keys=True).encode()).hexdigest()
+
+
+def bonuses(state):
+    path = Path(state) / 'parental-bonuses.json'
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
+def bonus(ident, minutes):
+    with LOCK:
+        if type(ident) is not int or type(minutes) is not int or not 0 <= minutes <= 240 or CURRENT is None:
+            raise Error('Profilo o durata bonus non validi (0–240 minuti)')
+        profile = next((p for p in active_profiles(CURRENT['settings']) if p['id'] == ident), None)
+        if profile is None:
+            raise Error('Profilo non attivo')
+        data = bonuses(STATE); key = bonus_key(profile)
+        if minutes:
+            data[key] = time.time() + minutes * 60
+        else:
+            data.pop(key, None)
+        known = {bonus_key(p) for p in active_profiles(CURRENT['settings'])}
+        data = {k: v for k, v in data.items() if k in known and v > time.time()}
+        security.write(Path(STATE) / 'parental-bonuses.json', json.dumps(data)); tick()
+        return {'ok': True, 'profiles': copy.deepcopy(RUNTIME['profiles'])}
+
+
 def drop_rules(profile, settings, interfaces):
     dev = json.dumps(next(r['device'] for r in interfaces if r['name'] == profile['interface']))
     if settings.get('reporting', False):
@@ -343,15 +458,20 @@ def drop_rules(profile, settings, interfaces):
             f'add rule inet murus_igneus pc_schedule oifname {dev} ip daddr {clients} counter drop comment "parental {profile["id"]}"']
 
 
-def schedule_rules(settings, interfaces, overrides, now=None, ready=None):
+def schedule_rules(settings, interfaces, overrides, now=None, ready=None, grants=None):
     lines = ['flush chain inet murus_igneus pc_schedule']; rows = []
     stamp = time.time() if now is None else now.timestamp()
+    ipv6_lans = {p['interface'] for p in active_profiles(settings) if p.get('block_ipv6')}
     for p in active_profiles(settings):
         temporary = overrides.get(fingerprint(p), 0)
         failed = ready is not None and not ready.get(p['id'], False)
-        reason = 'resolver fermo' if failed else 'pausa' if p['paused'] or temporary > stamp else 'fuori orario' if not in_window(p, settings['timezone'], now) else ''
+        grant = (grants or {}).get(bonus_key(p), 0)
+        night = in_mode(p, 'night_windows', settings['timezone'], now)
+        study = in_mode(p, 'study_windows', settings['timezone'], now)
+        reason = 'resolver fermo' if failed else 'pausa' if p['paused'] or temporary > stamp else 'notte' if night and grant <= stamp else 'fuori orario' if grant <= stamp and not in_window(p, settings['timezone'], now) else ''
         rows.append({'id': p['id'], 'name': p['name'], 'blocked': bool(reason), 'reason': reason,
-                     'pause_until': temporary if temporary > stamp else None, 'resolver_running': not failed})
+                     'pause_until': temporary if temporary > stamp else None, 'resolver_running': not failed, 'bonus_until': grant if grant > stamp else None,
+                     'study': study, 'devices': copy.deepcopy(p.get('devices', [])), 'ipv6_blocked_lan': p['interface'] in ipv6_lans})
         if reason:
             lines += drop_rules(p, settings, interfaces)
     return '\n'.join(lines) + '\n', rows
@@ -363,11 +483,12 @@ def tick(now=None):
         if CURRENT is None:
             return
         settings = CURRENT['settings']; interfaces = CURRENT['interfaces']
-        ready = {p['id']: bool(security.PROCESSES.get('parental-' + str(p['id'])) and security.PROCESSES['parental-' + str(p['id'])].poll() is None) for p in active_profiles(settings)}
-        script, rows = schedule_rules(settings, interfaces, pauses(STATE), now, ready)
+        synchronize_dns(now)
+        ready = {p['id']: bool(security.PROCESSES.get('parental-' + str(p['id'])) and security.PROCESSES['parental-' + str(p['id'])].poll() is None and DNS_MODES.get(p['id']) == in_mode(p, 'study_windows', settings['timezone'], now)) for p in active_profiles(settings)}
+        script, rows = schedule_rules(settings, interfaces, pauses(STATE), now, ready, bonuses(STATE))
         if script != LAST_RULES:
             security.command(['nft', '-f', '-'], script); LAST_RULES = script
-        RUNTIME.update(running=True, profiles=rows, error='')
+        RUNTIME.update(running=True, profiles=rows)
 
 
 def pause(ident, minutes):
@@ -397,7 +518,7 @@ def stop():
     if THREAD is not None:
         THREAD.join(); THREAD = None
     with LOCK:
-        CURRENT = None; LAST_RULES = None
+        CURRENT = None; LAST_RULES = None; DNS_MODES.clear(); DNS_RETRY.clear()
         for name in list(security.PROCESSES):
             if name.startswith('parental-'):
                 security.stop(name)
@@ -407,9 +528,17 @@ def stop():
 
 
 def activate(plan, state, management):
-    global STATE, CURRENT, THREAD, REPORTER
+    global STATE, CURRENT, THREAD, REPORTER, MANAGEMENT, AUTO_NEXT
     stage(plan)
-    stop(); STATE = Path(state)
+    stop(); STATE = Path(state); MANAGEMENT = management; AUTO_NEXT = 0
+    AUTO_STATUS.update(last_success=None, error='')
+    status_path = STATE / 'parental-auto-update.json'
+    if status_path.exists():
+        try:
+            stored = json.loads(status_path.read_text())
+            AUTO_STATUS.update(last_success=stored.get('last_success'))
+        except (ValueError, TypeError, AttributeError):
+            AUTO_STATUS['error'] = 'Storico aggiornamenti non leggibile'
     if not plan or not active_profiles(plan['settings']):
         return
     settings = plan['settings']; profiles = active_profiles(settings); ports = {r['name']: r for r in plan['interfaces']}
@@ -419,7 +548,9 @@ def activate(plan, state, management):
             REPORTER = reporting.Collector(settings, plan['interfaces'], STATE)
         for profile in profiles:
             name = 'parental-' + str(profile['id']); path = security.RUN / (name + '.conf')
-            security.write(path, dns_config(profile, settings, ports[profile['interface']], feeds, management))
+            study = in_mode(profile, 'study_windows', settings['timezone'])
+            security.write(path, dns_config(profile, settings, ports[profile['interface']], feeds, management, study))
+            DNS_MODES[profile['id']] = study
             security.command(['dnsmasq', '--test', '--conf-file=' + str(path)])
             args = ['dnsmasq', '--keep-in-foreground', '--conf-file=' + str(path), '--pid-file=']
             if REPORTER is not None:
@@ -436,6 +567,7 @@ def activate(plan, state, management):
             while not STOP.wait(2):
                 try:
                     tick()
+                    maybe_update()
                 except Exception as exc:
                     with LOCK:
                         RUNTIME['error'] = str(exc)[:300]
@@ -451,12 +583,13 @@ def inventory(state):
         path = feed_path(category, state); entry = {'id': category, 'name': label, 'license': 'GPL-3.0', 'source': 'https://github.com/hagezi/dns-blocklists', 'ready': False}
         if path.exists():
             try:
-                data = json.loads(path.read_text()); entry.update(ready=True, count=len(data['domains']), updated=data['updated'], sha256=data['sha256'])
+                data = json.loads(path.read_text()); entry.update(ready=True, count=len(data['domains']), updated=data['updated'], sha256=data['sha256'], stale=time.time() - data['updated'] > 2 * 86400)
             except (ValueError, KeyError, TypeError):
                 entry['error'] = 'Lista locale non valida: riscaricarla'
         lists.append(entry)
     with LOCK:
         return {**copy.deepcopy(RUNTIME), 'lists': lists, 'services': list(SERVICES), 'task': TASK.status(),
+                'auto_update': {**AUTO_STATUS, 'enabled': bool(CURRENT and CURRENT['settings'].get('auto_update')), 'next_check': AUTO_NEXT or None},
                 'note': 'Filtra domini, non contenuti HTTPS. VPN/DoH sconosciuti, IP modificati fuori dal profilo, rete mobile e traffico che non attraversa Murus possono aggirarlo.'}
 
 
@@ -486,6 +619,10 @@ def proxy_allowed(client, hostname):
             return False
         if profile['enforce_dns'] and matches(hostname, set(ENCRYPTED_DNS)):
             return False
+        if (profile.get('safe_search') and hostname in GOOGLE_HOSTS) or (profile.get('youtube_restricted', 'off') != 'off' and hostname in YOUTUBE_HOSTS):
+            return False  # The HTTP proxy resolves independently; it must not bypass DNS provider VIPs.
+        if row.get('study') and not matches(hostname, set(profile.get('study_domains', []))):
+            return False
         if matches(hostname, set(profile['allowed_domains'])):
             return True
         return not matches(hostname, BLOCKED.get(profile['id'], set()))
@@ -503,3 +640,128 @@ def clear_report(state):
         else:
             reporting.erase(state)
     return {'ok': True}
+
+
+DNS_RETRY = {}
+UPDATE_ALLOWED = lambda: True
+
+
+def start_resolver(ident):
+    name = 'parental-' + str(ident)
+    security.stop(name)
+    args = ['dnsmasq', '--keep-in-foreground', '--conf-file=' + str(security.RUN / (name + '.conf')), '--pid-file=']
+    if REPORTER is not None:
+        REPORTER.spawn(ident, name, args)
+    else:
+        security.spawn(name, args)
+    time.sleep(.1)
+    if security.PROCESSES[name].poll() is not None:
+        raise Error('Resolver parental non avviato')
+    if REPORTER is not None:
+        # Finished readers are joined/pruned on every restart, bounding long-lived memory.
+        REPORTER.readers = [thread for thread in REPORTER.readers if thread.is_alive()]
+
+
+def replace_dns(feeds, now=None):
+    """Validate all candidates before switching; restore every previous resolver on failure.
+
+    Caller holds LOCK. Firewall, VPN, DHCP and reporting counters are untouched.
+    """
+    settings = CURRENT['settings']; ports = {r['name']: r for r in CURRENT['interfaces']}
+    old_blocked = copy.deepcopy(BLOCKED); old_modes = DNS_MODES.copy(); old = {}; candidates = {}; touched = []
+    try:
+        for p in active_profiles(settings):
+            ident = p['id']; path = security.RUN / ('parental-' + str(ident) + '.conf')
+            old[ident] = path.read_text()
+            study = in_mode(p, 'study_windows', settings['timezone'], now)
+            data = dns_config(p, settings, ports[p['interface']], feeds, MANAGEMENT, study)
+            check = path.with_suffix('.candidate')
+            security.write(check, data)
+            try:
+                security.command(['dnsmasq', '--test', '--conf-file=' + str(check)])
+            finally:
+                check.unlink(missing_ok=True)
+            candidates[ident] = (path, data, study)
+        for ident, (path, data, study) in candidates.items():
+            touched.append(ident)
+            security.write(path, data); start_resolver(ident); DNS_MODES[ident] = study
+    except Exception as exc:
+        failures = []
+        for ident in touched:
+            data = old[ident]
+            try:
+                security.write(security.RUN / ('parental-' + str(ident) + '.conf'), data)
+                start_resolver(ident)
+            except Exception as recovery:
+                failures.append(str(recovery)[:150])
+        BLOCKED.clear(); BLOCKED.update(old_blocked); DNS_MODES.clear(); DNS_MODES.update(old_modes)
+        raise Error('Aggiornamento DNS annullato: ' + str(exc)[:200] + ('; ripristino incompleto: ' + '; '.join(failures) if failures else '')) from exc
+
+
+def synchronize_dns(now=None):
+    settings = CURRENT['settings']; stamp = time.monotonic()
+    changed = [p for p in active_profiles(settings) if DNS_MODES.get(p['id']) != in_mode(p, 'study_windows', settings['timezone'], now)]
+    if not changed or any(DNS_RETRY.get(p['id'], 0) > stamp for p in changed):
+        return
+    try:
+        replace_dns(load_domains(settings, STATE), now)
+        RUNTIME['error'] = ''
+    except Exception as exc:
+        for p in changed:
+            DNS_RETRY[p['id']] = stamp + 30
+        RUNTIME['error'] = str(exc)[:300]
+        # tick observes the mode mismatch and blocks transit until a successful retry.
+
+
+def refresh_active_lists(expected):
+    """Download outside the runtime lock; reject results for a stopped/replaced plan."""
+    settings = expected['settings']; state = STATE
+    categories = sorted({c for p in active_profiles(settings) for c in p['categories']})
+    payloads = {category: download_feed(category) for category in categories}
+    with LOCK:
+        if CURRENT is not expected or STOP.is_set() or not UPDATE_ALLOWED():
+            raise Error('Configurazione cambiata: aggiornamento automatico rinviato')
+        previous = {c: feed_path(c, state).read_text() for c in categories}
+        old_feeds = load_domains(settings, state)
+        try:
+            for category, payload in payloads.items():
+                save_feed(state, category, payload)
+            replace_dns({c: p['domains'] for c, p in payloads.items()})
+            tick()
+        except Exception:
+            for category, data in previous.items():
+                security.write(feed_path(category, state), data)
+            # replace_dns restores configs on restart failure. Also restore after a later nft failure.
+            replace_dns(old_feeds)
+            tick()
+            raise
+        AUTO_STATUS.update(last_success=time.time(), error='')
+        security.write(Path(state) / 'parental-auto-update.json', json.dumps(AUTO_STATUS))
+        return {'message': 'Liste aggiornate e attivate nei resolver; rete e VPN conservate.'}
+
+
+def maybe_update():
+    global AUTO_NEXT
+    with LOCK:
+        if CURRENT is None or STOP.is_set() or not CURRENT['settings'].get('auto_update') or not UPDATE_ALLOWED():
+            return
+        if time.time() < AUTO_NEXT or (TASK.status() or {}).get('state') == 'running':
+            return
+        settings = CURRENT['settings']; categories = {c for p in active_profiles(settings) for c in p['categories']}
+        if not categories:
+            AUTO_NEXT = time.time() + 3600
+            return
+        due = any(not feed_path(c).exists() or time.time() - json.loads(feed_path(c).read_text())['updated'] >= 86400 for c in categories)
+        AUTO_NEXT = time.time() + 3600  # On failure retry in an hour; no tight retry loop.
+        if not due:
+            return
+        expected = CURRENT
+        def action():
+            try:
+                return refresh_active_lists(expected)
+            except Exception as exc:
+                with LOCK:
+                    if CURRENT is expected:
+                        AUTO_STATUS['error'] = str(exc)[:300]
+                raise
+        TASK.start(action)

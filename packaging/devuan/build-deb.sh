@@ -12,9 +12,11 @@ install -d "$stage/DEBIAN" "$stage/usr/lib/murus-igneus" "$stage/usr/sbin" "$sta
 for file in __init__.py server.py configuration.py migration.py security.py avproxy.py jobs.py installer.py networking.py traffic.py parental_report.py parental.py parental.js eventlog.py authentication.py enterprise.py enterprise.js updates.py network.js tasks.py assistant.py switches.py management.js index.html app.js style.css LICENSE-MIT; do
     install -m 0644 "$root/src/murus_igneus/$file" "$stage/usr/lib/murus-igneus/$file"
 done
-for file in murus-serve murus-prepare murus-info murus-update; do
+for file in murus-serve murus-prepare murus-info murus-update murus-install; do
     install -m 0755 "$root/packaging/devuan/files/$file" "$stage/usr/sbin/$file"
 done
+install -d "$stage/etc/profile.d"
+install -m 0644 "$root/packaging/devuan/files/murus-welcome.sh" "$stage/etc/profile.d/murus-welcome.sh"
 install -m 0755 "$root/packaging/devuan/files/murus-igneus.initd" "$stage/etc/init.d/murus-igneus"
 install -m 0644 "$root/packaging/devuan/files/murus-igneus.default" "$stage/etc/default/murus-igneus"
 install -m 0644 "$root/packaging/devuan/files/90-murus-igneus.conf" "$stage/etc/sysctl.d/90-murus-igneus.conf"
@@ -23,13 +25,14 @@ install -m 0644 "$root/src/murus_igneus/LICENSE-MIT" "$stage/usr/share/doc/murus
 install -m 0644 "$root/docs/DEVUAN.md" "$stage/usr/share/doc/murus-igneus/DEVUAN.md"
 install -m 0644 "$root/docs/AI-SWITCHES.md" "$stage/usr/share/doc/murus-igneus/AI-SWITCHES.md"
 install -m 0644 "$root/docs/NATIVE-NETWORKING.md" "$stage/usr/share/doc/murus-igneus/NATIVE-NETWORKING.md"
+install -m 0644 "$root/docs/ALPHA9.md" "$stage/usr/share/doc/murus-igneus/ALPHA9.md"
 install -m 0644 "$root/docs/ALPHA8.md" "$stage/usr/share/doc/murus-igneus/ALPHA8.md"
 install -m 0644 "$root/docs/ALPHA7.md" "$stage/usr/share/doc/murus-igneus/ALPHA7.md"
 install -m 0644 "$root/docs/ALPHA5.md" "$stage/usr/share/doc/murus-igneus/ALPHA5.md"
 install -m 0644 "$root/docs/PARENTAL.md" "$stage/usr/share/doc/murus-igneus/PARENTAL.md"
 cat > "$stage/DEBIAN/control" <<'EOF'
 Package: murus-igneus
-Version: 0.3.0~alpha.8
+Version: 0.3.0~alpha.9
 Section: net
 Priority: optional
 Architecture: all
@@ -74,6 +77,6 @@ if [ "${1:-}" = configure ]; then
 fi
 EOF
 chmod 0755 "$stage/DEBIAN/preinst" "$stage/DEBIAN/prerm" "$stage/DEBIAN/postinst"
-dpkg-deb --root-owner-group --build "$stage" "$output/murus-igneus_0.3.0~alpha.8_all.deb"
+dpkg-deb --root-owner-group --build "$stage" "$output/murus-igneus_0.3.0~alpha.9_all.deb"
 
 

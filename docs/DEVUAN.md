@@ -15,7 +15,7 @@ The official Devuan live ISOs include non-free firmware. Therefore, merely
 remastering an unmodified live ISO does not satisfy this project's free-software
 requirement. The Murus builder instead bootstraps a fresh root from signed main
 packages and rejects non-free/contrib and firmware/microcode package names.
-The builder seed is not copied into the target image.
+The builder does not remaster the seed filesystem. It uses mmdebstrap/apt with the Devuan archive keyring and mandatory repository/package authentication. Because the current signed archive omits devuan-keyring, that one public trust-anchor package is checked with dpkg verification and repacked from the builder; CI fixes the public Devuan seed by OCI SHA256. No other seed package is copied into the fresh root. The package version, repack digest, seed image and individual keyfile hashes are recorded in bootstrap-provenance.json, included in the ISO and release, and checked again after UEFI boot. The resulting root must identify itself as Devuan 6 before installation continues. All regular OS/application dependencies are installed from signed Excalibur/main sources.
 
 References:
 - https://www.devuan.org/os/releases
@@ -147,3 +147,8 @@ antivirus verification and is reported as such. The test never selects or
 erases a disk.
 
 
+
+
+## Live console and web entry
+
+The live image is headless. On Proxmox attach the management NIC to the bridge used by the administrator's PC. The boot console displays its IPv4 URL on HTTPS port 8443; `murus-info` repeats the actual addresses after root login. The main web page has an explicit Install button. `murus-install` is the independent interactive console installer and `murus-install --list` is read-only. Linux `install` is unrelated. A destination must be an unmounted disk of at least 8 GiB, selected explicitly and confirmed by typing its full deletion phrase. Web and console operations share a cross-process installation lock.
