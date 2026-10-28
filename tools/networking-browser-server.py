@@ -26,6 +26,25 @@ def no_apply(*args, **kwargs):
 
 with tempfile.TemporaryDirectory(prefix='murus-browser-fixture-') as state:
     server.STATE = Path(state); (server.STATE / 'admin.password').write_text('test-browser')
+    if '--first-login' in sys.argv:
+        shadow = server.STATE / 'test-shadow'
+        shadow.write_text('root:'+server.authentication.password_hash('igneus','$6$fixture$')+':0:0:99999:7:::\n')
+        server.authentication.write(server.STATE/'credentials.json',{'system_root':True})
+        original_check = server.authentication.check_password
+        original_status = server.authentication.password_status
+        original_change = server.authentication.change_password
+        def fixture_check(state, value, unused=None):
+            return original_check(state, value, shadow)
+        def fixture_status(state):
+            return original_status(state, shadow)
+        def fake_chpasswd(args, **kwargs):
+            assert args == ['chpasswd','-e']
+            shadow.write_text(kwargs['input'].strip()+':20000:0:99999:7:::\n')
+        def fixture_change(state, value, confirmation):
+            return original_change(state, value, confirmation, shadow, fake_chpasswd)
+        server.authentication.check_password = fixture_check
+        server.authentication.password_status = fixture_status
+        server.authentication.change_password = fixture_change
     server.run = read_only; server.apply = no_apply
     server.traffic.snapshot = lambda: {'time': 1, 'truncated': False, 'errors': [], 'connections': [],
                                        'events': [{'raw': 'OW dnat 1 IN=eth1 OUT=eth2.20 SRC=192.0.2.10 DST=198.51.100.10 PROTO=TCP DPT=80'}]}

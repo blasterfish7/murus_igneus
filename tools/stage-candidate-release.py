@@ -18,7 +18,7 @@ sys.path.insert(0,str(ROOT/'src/murus_igneus'))
 from migration import VERSION
 assert re.fullmatch(r'0\.3\.0-alpha\.[0-9]+',VERSION)
 LABEL=VERSION.removeprefix('0.3.0-').replace('.','')
-ISO_CHECKS=59
+ISO_CHECKS=67
 API = 'https://api.github.com/repos/' + REPO
 
 

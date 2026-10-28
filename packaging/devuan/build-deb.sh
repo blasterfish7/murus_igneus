@@ -9,7 +9,7 @@ output=$(CDPATH='' cd -- "$output" && pwd)
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT HUP INT TERM
 install -d "$stage/DEBIAN" "$stage/usr/lib/murus-igneus" "$stage/usr/sbin" "$stage/etc/init.d" "$stage/etc/default" "$stage/usr/share/doc/murus-igneus" "$stage/etc/sysctl.d"
-for file in __init__.py server.py configuration.py migration.py security.py avproxy.py jobs.py installer.py networking.py traffic.py parental_report.py parental.py parental.js eventlog.py authentication.py enterprise.py enterprise.js updates.py network.js tasks.py assistant.py switches.py management.js index.html app.js style.css LICENSE-MIT; do
+for file in __init__.py server.py configuration.py migration.py security.py avproxy.py jobs.py installer.py networking.py dhcp_client.py traffic.py parental_report.py parental.py parental.js eventlog.py authentication.py enterprise.py enterprise.js updates.py network.js tasks.py assistant.py switches.py management.js index.html app.js style.css LICENSE-MIT; do
     install -m 0644 "$root/src/murus_igneus/$file" "$stage/usr/lib/murus-igneus/$file"
 done
 for file in murus-serve murus-prepare murus-info murus-update murus-install; do
@@ -37,7 +37,7 @@ Section: net
 Priority: optional
 Architecture: all
 Maintainer: Murus Igneus contributors
-Depends: python3 (>= 3.11), nftables, iproute2, openssl, conntrack, kmod, wireguard-tools, strongswan-charon, strongswan-swanctl, libcharon-extra-plugins, libstrongswan-standard-plugins, iputils-ping, dpkg-repack, ca-certificates, tzdata, suricata, suricata-update, clamav, clamav-daemon, clamav-freshclam, python3-yaml, snmp, dnsmasq-base, rsync, fdisk, parted, dosfstools, e2fsprogs, grub-pc-bin, grub-efi-amd64-bin, grub2-common, openrc, init-system-helpers
+Depends: python3 (>= 3.11), nftables, iproute2, openssl, conntrack, kmod, wireguard-tools, strongswan-charon, strongswan-swanctl, libcharon-extra-plugins, libstrongswan-standard-plugins, iputils-ping, dpkg-repack, ca-certificates, tzdata, suricata, suricata-update, clamav, clamav-daemon, clamav-freshclam, python3-yaml, snmp, dnsmasq-base, udhcpc, rsync, fdisk, parted, dosfstools, e2fsprogs, grub-pc-bin, grub-efi-amd64-bin, grub2-common, openrc, init-system-helpers
 Description: Experimental IPv4 firewall management for Devuan 6 Excalibur
  Independent configuration editor and conservative configuration importer.
  Includes an OpenRC service. Includes VPN, IPS, HTTP antivirus, local AI connector and SNMP switch management.

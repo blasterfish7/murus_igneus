@@ -25,11 +25,10 @@ def prepare():
     state=Path('/etc/murus_igneus')
     state.mkdir(mode=0o700, exist_ok=True)
     state.chmod(0o700)
-    password=state/'admin.password'
-    if not password.exists():
-        fd=os.open(password, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(fd, 'w') as out:out.write('igneus\n')
-    # Existing web credentials and the root password are deliberately preserved.
+    import sys
+    sys.path.insert(0,'/usr/lib/murus-igneus')
+    import authentication
+    authentication.initialize_credentials(state)
 
 if __name__ == '__main__':
     prepare()

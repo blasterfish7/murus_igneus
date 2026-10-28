@@ -20,7 +20,7 @@ if not any(r.get('addr_info') for r in addresses):print('Nessun IPv4 di gestione
 print('Apri questi URL dal browser di un altro PC collegato alla rete di gestione; usa HTTPS e porta 8443.')
 print('Installazione web: pulsante Installa su disco. Dalla console live: murus-install (conferma il disco da cancellare).')
 print('Diagnostica servizio: rc-service murus-igneus status ; registro /var/log/murus-igneus.log')
-print('Utente web: admin | Password iniziale di laboratorio: igneus')
-print('Le credenziali già esistenti vengono conservate. Con la ISO ufficiale la console root usa la password di laboratorio igneus; con il solo pacchetto DEB resta quella di Devuan.')
+print('Utente web: admin | Console: root | Stessa password per entrambi')
+print('ISO nuova: password iniziale igneus, cambio obbligatorio al primo accesso web o console. Dopo il cambio usa la nuova password per entrambi.')
 print('Alpha sperimentale: cambiare le password prima di collegare la rete a Internet.')
 PYTHON

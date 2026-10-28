@@ -11,6 +11,7 @@ import socket
 import ssl
 import time
 import urllib.request
+import urllib.error
 import tempfile
 
 import pexpect
@@ -23,6 +24,7 @@ firmware = Path('/usr/share/OVMF')
 code = firmware / 'OVMF_CODE_4M.fd'; template = firmware / 'OVMF_VARS_4M.fd'
 assert code.is_file() and template.is_file(), 'OVMF 4M required'
 checks = []
+QA_PASSWORD = 'murus-console-lab-10'
 with tempfile.TemporaryDirectory(prefix='murus-iso-qa-') as work:
     disk=Path(work)/'install-disk.raw'
     with disk.open('wb') as file:file.truncate(16*1024**3)
@@ -38,12 +40,41 @@ with tempfile.TemporaryDirectory(prefix='murus-iso-qa-') as work:
     child = pexpect.spawn(args[0], args[1:], encoding='utf-8', timeout=360)
     log = (ROOT / 'dist/alpha10-iso-console.log').open('w'); child.logfile = log
     try:
-        child.expect(r'login:'); child.sendline('root'); child.expect('Password:'); child.sendline('igneus')
+        # Complete the required password setup through external HTTPS before console login.
+        credential_headers={'Authorization':'Basic '+base64.b64encode(b'admin:igneus').decode()}
+        external='https://127.0.0.1:'+str(web_port)+'/api/'
+        opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),urllib.request.HTTPSHandler(context=ssl._create_unverified_context()))
+        for attempt in range(180):
+            try:
+                with opener.open(urllib.request.Request(external+'auth/status',headers=credential_headers),timeout=3) as response:initial=json.load(response)
+                break
+            except OSError:time.sleep(2)
+        else:raise AssertionError('Initial HTTPS setup unavailable')
+        assert initial['password_change_required'] and initial['shared_console_password'],initial
+        try:opener.open(urllib.request.Request(external+'configuration',headers=credential_headers),timeout=5)
+        except urllib.error.HTTPError as error:assert error.code==403
+        else:raise AssertionError('Configuration available before mandatory password change')
+        credential_headers.update({'Content-Type':'application/json','X-Murus-Igneus-CSRF':initial['csrf']})
+        body=json.dumps({'password':QA_PASSWORD,'confirmation':QA_PASSWORD}).encode()
+        with opener.open(urllib.request.Request(external+'auth/password',headers=credential_headers,data=body),timeout=30) as response:assert json.load(response)['ok']
+        checks.append('Mandatory first-login password setup blocks configuration and changes the shared web/console password over real HTTPS');print('PASS '+checks[-1],flush=True)
+        child.expect(r'login:'); child.sendline('root'); child.expect('Password:'); child.sendline(QA_PASSWORD)
         child.expect(r'root@[^\r\n]*[#$] ')
         child.sendline("export PS1='MIQA# '")
         prompt = r'(?m)(?:^|\r|\n|\x1b\[\?2004h)MIQA# '
         child.expect(prompt)
         checks.append('UEFI live ISO boot and console login'); print('PASS ' + checks[-1], flush=True)
+
+        previous_password=QA_PASSWORD
+        child.sendline('passwd');child.expect(r'New password:',timeout=30)
+        QA_PASSWORD='murus-console-next-10';child.sendline(QA_PASSWORD)
+        child.expect(r'Retype new password:',timeout=30);child.sendline(QA_PASSWORD);child.expect(prompt,timeout=30)
+        new_headers={'Authorization':'Basic '+base64.b64encode(('admin:'+QA_PASSWORD).encode()).decode()}
+        with opener.open(urllib.request.Request(external+'auth/status',headers=new_headers),timeout=10) as response:assert not json.load(response)['password_change_required']
+        try:opener.open(urllib.request.Request(external+'auth/status',headers={'Authorization':'Basic '+base64.b64encode(('admin:'+previous_password).encode()).decode()}),timeout=10)
+        except urllib.error.HTTPError as error:assert error.code==401
+        else:raise AssertionError('Old web password survived a console password change')
+        checks.append('Console passwd changes are immediately recognized by web authentication and reject the previous password');print('PASS '+checks[-1],flush=True)
 
         def command(text, timeout=180):
             child.sendline(text + "; printf '\\n__MIQA_END__:%s\\n' \"$?\"")
@@ -70,10 +101,10 @@ print('Installed Devuan trust anchors verified')
         checks.append('Installed Devuan archive trust package and keyfiles match the recorded public builder provenance'); print('PASS ' + checks[-1],flush=True)
 
         # Read the real HTTPS backend, then preview a complete native VLAN plan.
-        probe = '''import base64,http.client,json,ssl,time,urllib.request
+        probe = 'QA_PASSWORD='+repr(QA_PASSWORD)+'\n'+'''import base64,http.client,json,ssl,time,urllib.request
 opener=urllib.request.build_opener(urllib.request.ProxyHandler({}),urllib.request.HTTPSHandler(context=ssl._create_unverified_context()))
 def api(path,data=None):
- h={'Authorization':'Basic '+base64.b64encode(b'admin:igneus').decode()}
+ h={'Authorization':'Basic '+base64.b64encode(('admin:'+QA_PASSWORD).encode()).decode()}
  if data is not None:h.update({'Content-Type':'application/json','X-Murus-Igneus-CSRF':csrf})
  r=opener.open(urllib.request.Request('https://127.0.0.1:8443/api/'+path,headers=h,data=json.dumps(data).encode() if data is not None else None),timeout=30)
  return json.load(r)
@@ -88,7 +119,7 @@ def auth_probe(password):
  header='Basic '+base64.b64encode(('admin:'+password).encode()).decode()
  conn.request('GET','/api/status',headers={'Authorization':header});r=conn.getresponse();result=(r.status,r.getheader('Retry-After'));r.read();conn.close();return result
 for attempt in range(10):assert auth_probe('controlled-incorrect-password')[0]==401
-assert auth_probe('igneus')==(429,'60')
+assert auth_probe(QA_PASSWORD)==(429,'60')
 assert api('status')['version']=='0.3.0-alpha.10'
 print('ISO_HTTPS_BASIC_THROTTLE_OK')
 devices=api('interfaces')['interfaces'];assert {row['device'] for row in devices}>={'eth0','eth1','eth2'},devices
@@ -132,7 +163,7 @@ print('ISO_ROOT_PARENTAL_APPLY_ROLLBACK_OK')
         checks.append('Real appliance HTTPS parental apply starts resolver and rollback stops it'); print('PASS ' + checks[-1], flush=True)
         remote=urllib.request.build_opener(urllib.request.ProxyHandler({}),urllib.request.HTTPSHandler(context=ssl._create_unverified_context()))
         def web(path,data=None):
-            headers={'Authorization':'Basic '+base64.b64encode(b'admin:igneus').decode()}
+            headers={'Authorization':'Basic '+base64.b64encode(('admin:'+QA_PASSWORD).encode()).decode()}
             if data is not None:headers.update({'Content-Type':'application/json','X-Murus-Igneus-CSRF':remote_csrf})
             request=urllib.request.Request(f'https://127.0.0.1:{web_port}/'+path,headers=headers,data=json.dumps(data).encode() if data is not None else None)
             with remote.open(request,timeout=20) as response:return response.read()
@@ -179,6 +210,16 @@ print('ISO_ROOT_PARENTAL_APPLY_ROLLBACK_OK')
         assert parental_report['success'] and len(parental_report['checks']) == 23, parental_report
         checks += ['Devuan ISO: ' + item for item in parental_report['checks']]
         print('PASS parental packet suite on original ISO: 23 checks', flush=True)
+        payload = base64.b64encode(gzip.compress((ROOT / 'tools/validate-dhcp-client-runtime.py').read_bytes())).decode()
+        command(': > /tmp/murus-qa/dhcp-client.b64')
+        for pos in range(0,len(payload),1000):
+            command("printf '%s' '"+payload[pos:pos+1000]+"' >> /tmp/murus-qa/dhcp-client.b64")
+        command("python3 -c \"import base64,gzip;from pathlib import Path;Path('/tmp/murus-qa/tools/validate-dhcp-client-runtime.py').write_bytes(gzip.decompress(base64.b64decode(Path('/tmp/murus-qa/dhcp-client.b64').read_bytes())))\"")
+        command('MURUS_LAB=YES unshare --mount --net --fork python3 /tmp/murus-qa/tools/validate-dhcp-client-runtime.py',timeout=300)
+        dhcp_report=json.loads(re.search(r'MIQA_DHCP=(\{[^\r\n]+\})',command("python3 -c \"import json;print('MIQA_DHCP='+json.dumps(json.load(open('/tmp/murus-qa/dist/dhcp-client-runtime-qa.json'))))\"")).group(1))
+        assert dhcp_report['success'] and len(dhcp_report['checks'])==6,dhcp_report
+        checks += ['Devuan ISO: '+item for item in dhcp_report['checks']]
+        print('PASS DHCP WAN and anti-lockout suite on original ISO: 6 checks',flush=True)
         # Install only onto the fresh sparse disk created by this disposable QEMU fixture.
         child.sendline("murus-install --disk /dev/vda; printf '\\n__MIQA_INSTALL_END__:%s\\n' \"$?\"")
         child.expect(r'Conferma \(Invio per annullare\): ',timeout=30)
@@ -192,7 +233,7 @@ print('ISO_ROOT_PARENTAL_APPLY_ROLLBACK_OK')
         child.close()
         disk_args=args.copy();cd=disk_args.index('-cdrom');del disk_args[cd:cd+2];disk_args[disk_args.index('-boot')+1]='c'
         child=pexpect.spawn(disk_args[0],disk_args[1:],encoding='utf-8',timeout=360);child.logfile=log
-        child.expect(r'login:');child.sendline('root');child.expect('Password:');child.sendline('igneus');child.expect(r'root@[^\r\n]*[#$] ')
+        child.expect(r'login:');child.sendline('root');child.expect('Password:');child.sendline(QA_PASSWORD);child.expect(r'root@[^\r\n]*[#$] ')
         child.sendline("export PS1='MIQA# '");child.expect(prompt)
         assert 'boot=live' not in command('cat /proc/cmdline')
         for attempt in range(60):
