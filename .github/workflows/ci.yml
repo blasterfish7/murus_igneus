@@ -1,181 +1,21 @@
-name: Python checks
+name: Publish verified alpha.9
 on:
   push:
-  pull_request:
+    branches: [codex/release-alpha9]
 permissions:
-  contents: read
+  contents: write
+  actions: read
 jobs:
-  tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - name: Install protocol test tools
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends snmp snmpd
-      - name: Python syntax
-        run: python -m compileall -q src/murus_igneus
-      - name: Install configuration parser used by Devuan
-        run: python -m pip install PyYAML==6.0.2
-      - name: Static Python checks
-        run: |
-          python -m pip install ruff==0.11.13
-          python -m ruff check --select F,E9 src tests
-      - name: Migration regression tests
-        run: python -m unittest discover -s tests -p 'test_*.py' -v
-      - name: Validate actual parental category downloads
-        if: github.event_name == 'push'
-        run: python tools/validate-parental-feeds.py
-      - name: Save actual feed validation report
-        if: github.event_name == 'push'
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: murus-parental-feed-qa
-          path: dist/parental-feed-qa.json
-          retention-days: 14
-      - name: Shell and JavaScript syntax
-        run: |
-          sh -n packaging/devuan/build-deb.sh
-          sh -n packaging/devuan/files/murus-igneus.initd
-          sh -n packaging/devuan/files/murus-serve
-          node --check src/murus_igneus/app.js
-          node --check src/murus_igneus/management.js
-          node --check src/murus_igneus/network.js
-          node --check src/murus_igneus/enterprise.js
-          node --check src/murus_igneus/parental.js
-          node tests/test_management_ui.js
-          node tests/test_network_ui.js
-      - name: Real Chromium native configuration GUI
-        run: |
-          npm install --prefix "$RUNNER_TEMP/murus-browser" playwright-core@1.64.1 @sparticuz/chromium@153.0.0
-          node tools/prepare-browser.cjs "$RUNNER_TEMP/murus-browser"
-          MURUS_PLAYWRIGHT="$RUNNER_TEMP/murus-browser/node_modules/playwright-core" MURUS_CHROMIUM="$RUNNER_TEMP/murus-browser/bin/chromium" node tools/validate-networking-browser.cjs
-      - name: Management HTTPS remains responsive during transaction locking
-        run: MURUS_LAB=YES python3 tools/validate-status-runtime.py
-      - name: Save browser acceptance report
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: murus-native-browser-qa
-          path: dist/browser-networking-qa.json
-          retention-days: 14
-      - name: Build Devuan package
-        run: sh packaging/devuan/build-deb.sh
-      - name: Upload Devuan package
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: murus-igneus-devuan-alpha
-          path: dist/*.deb
-          retention-days: 14
-
-  network-runtime:
+  publish:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Install isolated traffic test tools
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nftables iproute2 conntrack dnsmasq-base
-      - name: Exercise VLAN, DHCP, DNS, DNAT and rollback with real packets
-        run: sudo env MURUS_LAB=YES unshare --mount --net --fork python3 tools/validate-native-networking.py
-      - name: Save traffic acceptance report
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: murus-native-networking-qa
-          path: dist/native-networking-qa.json
-          retention-days: 14
-
-  enterprise-runtime:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install actual IKEv2 and network test tools
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nftables iproute2 iputils-ping strongswan-charon strongswan-swanctl libcharon-extra-plugins libstrongswan-standard-plugins
-      - name: Allow only the disposable lab paths in existing AppArmor profiles
-        run: |
-          for profile in usr.lib.ipsec.charon usr.sbin.swanctl; do
-            if [ -f "/etc/apparmor.d/$profile" ]; then
-              echo '/tmp/murus-enterprise-*/** rw,' | sudo tee -a "/etc/apparmor.d/local/$profile"
-              sudo apparmor_parser -r "/etc/apparmor.d/$profile"
-            fi
-          done
-      - name: Exercise IKEv2 and WAN failover using real packets
-        run: |
-          sudo env MURUS_LAB=YES unshare --mount --net --fork python3 tools/validate-enterprise-runtime.py || { sudo dmesg | tail -80; exit 1; }
-      - name: Save enterprise acceptance report
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: murus-enterprise-runtime-qa
-          path: dist/enterprise-runtime-qa.json
-          retention-days: 14
-
-  parental-runtime:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install parental packet lab tools
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nftables iproute2 conntrack dnsmasq-base
-      - name: Test actual DNS, schedules, pauses, reservations and local proxy
-        run: sudo env MURUS_LAB=YES unshare --mount --net --fork python3 tools/validate-parental-runtime.py
-      - name: Save parental acceptance report
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: murus-parental-runtime-qa
-          path: dist/parental-runtime-qa.json
-          retention-days: 14
-
-  devuan-iso:
-    permissions:
-      contents: write
-    needs: [tests, network-runtime, enterprise-runtime, parental-runtime]
-    if: github.event_name == 'push'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 60
-    container:
-      image: dyne/devuan:excalibur@sha256:10f6138df94c08164f300a2f35f96cd8c8966fc4948550dbe0485149d020248f
-      options: --privileged
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build signed-main Devuan appliance ISO
-        env:
-          MURUS_BUILD_SEED_IMAGE: dyne/devuan:excalibur@sha256:10f6138df94c08164f300a2f35f96cd8c8966fc4948550dbe0485149d020248f
-        run: bash tools/build-devuan-iso.sh
-      - name: Install disposable UEFI test tools
-        run: apt-get install -y --no-install-recommends qemu-system-x86 ovmf python3-pexpect
-      - name: Boot original ISO and run real network acceptance in guest
-        run: MURUS_LAB=YES python3 tools/validate-iso-networking.py
-      - name: Save ISO, checksums and package manifest
-        id: upload_iso
-        if: always()
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
-        with:
-          name: murus-igneus-devuan-iso
-          path: |
-            dist/*.iso
-            dist/SHA256SUMS
-            dist/packages-devuan.tsv
-            dist/signature-status.txt
-            dist/bootstrap-provenance.json
-            dist/clamav-build.log
-            dist/alpha9-iso-networking-qa.json
-            dist/alpha9-iso-console.log
-          compression-level: 0
-          retention-days: 2
-
-
-
-      - name: Preserve tested ISO in a private draft if Actions storage is full
-        if: success() && steps.upload_iso.outcome == 'failure' && github.event_name == 'push'
+      - name: Verify original ISO, package sources and all asset digests
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 tools/stage-candidate-release.py
+          MURUS_RELEASE_TARGET: 7df5cfc45e3d13f446b26ed326d8850c8432c9da
+          MURUS_DRAFT_ID: '426404136'
+          MURUS_TESTED_SOURCE: '5dc406daae89e20adb7a207597730b9ad88c8e46'
+          MURUS_TESTED_RUN: '40653511277'
+        run: python3 tools/publish-alpha9.py
