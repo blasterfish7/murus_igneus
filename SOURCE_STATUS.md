@@ -1,3 +1,14 @@
+# Published release — 0.3.0-alpha.10
+
+PR #12 is merged. [Download alpha.10](https://github.com/blasterfish7/murus_igneus/releases/tag/v0.3.0-alpha.10): original tested ISO, DEB, guide, checksums and acceptance/provenance manifests. Earlier releases and drafts remain unchanged.
+
+Tag target: `bfa526f0140595c7dad6afa48d4326164b35c772`; tested source: `a5249d17f0a50e3aa45195b50d7ba6be8c7e856a`. Only acceptance documentation differs at the release target. [Publisher 40700420851](https://github.com/blasterfish7/murus_igneus/actions/runs/40700420851) verified successful CI, source ancestry, original ISO/DEB hashes, the 67-check ISO report, Devuan trust provenance, all 28 packaged application files, installed commands/init/profile and all ten asset digests. No ISO/DEB rebuild in the publisher.
+
+ISO SHA256: `c60bbab52010d09e1dd283eba6a204e400b6606b99b1b9ec314731f943fcffaa`.
+DEB SHA256: `1954d47f9e0f878c7641cf5def9274e234c88abe932bdc36f5a0ebbdb205e710`.
+
+Includes detected NIC inventory, DHCP WAN, default-route authoring, required first-login password change with a single root/web password authority and protected anti-lockout management. The tested install preserves the changed password across an independent disk boot. See [ALPHA10](docs/ALPHA10.md), [ISO QA](docs/ISO-ALPHA10-QA.md), [structured summary](docs/qa/alpha10-validation.json).
+
 # Alpha.10 acceptance — 2026-10-28 UTC
 
 Tested source: `a5249d17f0a50e3aa45195b50d7ba6be8c7e856a`. [CI run 40662424590 passed](https://github.com/blasterfish7/murus_igneus/actions/runs/40662424590): 231 Python tests without skips, 19 Chromium checks, management TLS/transaction-lock fixture, 13 native / 9 enterprise / 23 parental / 6 DHCP WAN and anti-lockout packet checks and four real HTTPS category downloads.
@@ -8,7 +19,7 @@ Adds hardware NIC inventory independent of the draft, a DHCP WAN client with val
 
 ISO: 475052032 bytes, SHA256 `c60bbab52010d09e1dd283eba6a204e400b6606b99b1b9ec314731f943fcffaa`. DEB: 121764 bytes, SHA256 `1954d47f9e0f878c7641cf5def9274e234c88abe932bdc36f5a0ebbdb205e710`.
 
-Original validated assets are staged privately; publication is pending source/asset verification. See [ALPHA10](docs/ALPHA10.md), [ISO QA](docs/ISO-ALPHA10-QA.md) and [structured summary](docs/qa/alpha10-validation.json). Only QA documentation is added after the tested source. Physical hardware, BIOS/Secure Boot, full UTM efficacy and live OpenAI calls are not certified.
+Original validated assets are published without rebuilding; source and asset correspondence was verified. See [ALPHA10](docs/ALPHA10.md), [ISO QA](docs/ISO-ALPHA10-QA.md) and [structured summary](docs/qa/alpha10-validation.json). Only QA documentation is added after the tested source. Physical hardware, BIOS/Secure Boot, full UTM efficacy and live OpenAI calls are not certified.
 
 ---
 
