@@ -1,0 +1,57 @@
+{
+  "version": "0.3.0-alpha.9",
+  "source_sha": "5dc406daae89e20adb7a207597730b9ad88c8e46",
+  "run_id": 40653511277,
+  "python_tests": 216,
+  "python_skips": 0,
+  "chromium_checks": 14,
+  "native_packet_checks": 13,
+  "enterprise_packet_checks": 9,
+  "parental_packet_checks": 23,
+  "real_https_category_feeds": 4,
+  "management_tls_lock_fixture": true,
+  "iso_uefi_checks": 58,
+  "external_management_https": true,
+  "console_disk_install": true,
+  "autonomous_uefi_disk_boot_without_iso": true,
+  "iso_sha256": "320bafcb10698890b6931d3441bfa0fdc592665aa4e64e8cc852bd486222fbfe",
+  "iso_size": 475041792,
+  "deb_sha256": "0567a75af44bd95b3a52b06764761bcb0070e586742e9cfc54d72b59a70babd6",
+  "deb_size": 115640,
+  "scope": "Disposable network namespaces and QEMU TCG UEFI live ISO, external management HTTPS, installation onto a dedicated blank 16 GiB virtual disk and independent disk boot. No physical hardware, BIOS/Secure Boot or full UTM efficacy claim.",
+  "candidate_release_id": 426404136,
+  "assets": {
+    "alpha9-iso-networking-qa.json": {
+      "size": 5769,
+      "sha256": "986fd82300b96588ad011cc4c6433a0a2717cf3a54a1332daede0080d5c4882a"
+    },
+    "bootstrap-provenance.json": {
+      "size": 833,
+      "sha256": "99036fc4779279b691fdbdecbfad0daa21d6ba7d40d6f6653a4f3bc8cdfff82a"
+    },
+    "candidate-validation.json": {
+      "size": 1150,
+      "sha256": "17cf64b2e761108adb3be48cc44c282050843091f8e5096b5d41e8baf3c6f56f"
+    },
+    "murus-igneus-0.3.0-alpha.9-devuan-amd64.iso": {
+      "size": 475041792,
+      "sha256": "320bafcb10698890b6931d3441bfa0fdc592665aa4e64e8cc852bd486222fbfe"
+    },
+    "murus-igneus_0.3.0-alpha.9_all.deb": {
+      "size": 115640,
+      "sha256": "0567a75af44bd95b3a52b06764761bcb0070e586742e9cfc54d72b59a70babd6"
+    },
+    "packages-devuan.tsv": {
+      "size": 9627,
+      "sha256": "9e4cf51e6c6b22b8faf90bfa00f808365c2a72d1c74c9ab383473c9c3ede563c"
+    },
+    "SHA256SUMS": {
+      "size": 110,
+      "sha256": "7c449d1c6dceecd08125b9c9d88f45d35c1e4d6c1a7510eb0970e44a4f449915"
+    },
+    "signature-status.txt": {
+      "size": 57,
+      "sha256": "5db8636adba8ad2b58951db44644e4c07fa0705570adecdba0f2af969790e484"
+    }
+  }
+}

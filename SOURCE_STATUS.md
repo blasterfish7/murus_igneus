@@ -1,3 +1,17 @@
+# Alpha.9 acceptance — 2026-10-28 UTC
+
+Tested source: `5dc406daae89e20adb7a207597730b9ad88c8e46`. [CI run 40653511277 passed](https://github.com/blasterfish7/murus_igneus/actions/runs/40653511277): 216 Python tests without skips, 14 Chromium checks, management TLS/transaction-lock fixture, 13 native / 9 enterprise / 23 parental packet checks and four real HTTPS category downloads.
+
+The original Devuan ISO passed 58 UEFI checks, including external management HTTPS, console discovery, confirmed installation onto a dedicated blank 16 GiB virtual disk and autonomous disk boot with the ISO detached. The backend serves HTTPS after disk boot and correctly identifies the installed system.
+
+Adds family profiles with named devices, SafeSearch/YouTube, study/night schedules, persistent temporary bonuses, automatic validated list refresh and an explicit whole-LAN IPv6 guard. Administration gains grouped searchable navigation, local light/dark themes, responsive layout and expandable family cards. Live setup exposes web/console installation and real access URLs. No Fortinet code or firmware.
+
+ISO: 475041792 bytes, SHA256 `320bafcb10698890b6931d3441bfa0fdc592665aa4e64e8cc852bd486222fbfe`. DEB: 115640 bytes, SHA256 `0567a75af44bd95b3a52b06764761bcb0070e586742e9cfc54d72b59a70babd6`.
+
+Original validated assets are staged privately; publication is pending source/asset verification. See [ALPHA9](docs/ALPHA9.md), [ISO QA](docs/ISO-ALPHA9-QA.md) and [structured summary](docs/qa/alpha9-validation.json). Only QA documentation is added after the tested source. Physical hardware, BIOS/Secure Boot, full UTM efficacy and live OpenAI calls are not certified.
+
+---
+
 # Published release — 0.3.0-alpha.8
 
 PRs #9 and #10 are merged into main. Historical draft PRs #1/#4 are closed with branches preserved. [Download alpha.8](https://github.com/blasterfish7/murus_igneus/releases/tag/v0.3.0-alpha.8): original tested ISO, DEB, guide, checksums and acceptance report. Earlier releases are preserved.
