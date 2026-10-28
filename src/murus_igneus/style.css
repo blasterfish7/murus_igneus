@@ -18,3 +18,5 @@ details{border:1px solid var(--line);border-radius:9px;background:var(--panel);p
 .profile-name{min-width:0;overflow-wrap:anywhere}
 
 .switch-card>button{align-self:start}
+
+#detected-interfaces .actions{justify-content:space-between}#detected-interfaces .actions h3{margin:0}#detected-interfaces .table-wrap{max-height:420px}#detected-interfaces td:last-child{min-width:155px}

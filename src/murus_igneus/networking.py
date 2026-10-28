@@ -21,6 +21,33 @@ def defaults():
     return {'dhcp_reservations': [], 'dhcp': [], 'dns': {'enabled': False, 'interfaces': [], 'upstream_servers': [], 'domain': 'lan'}, 'port_forwards': []}
 
 
+def interface_inventory(management, runner):
+    """Read kernel interfaces, including the reserved management port; never configure them."""
+    rows = json.loads(runner(['ip', '-j', '-d', 'address', 'show']))
+    result = []
+    for row in rows:
+        name = row.get('ifname', '')
+        if not name or name == 'lo':
+            continue
+        addresses = []
+        for entry in row.get('addr_info', []):
+            if entry.get('family') not in ('inet', 'inet6'):
+                continue
+            try:
+                addresses.append(str(ip.ip_interface(str(entry['local']) + '/' + str(entry['prefixlen']))))
+            except (KeyError, ValueError):
+                continue
+        kind = row.get('linkinfo', {}).get('info_kind', row.get('link_type', 'unknown'))
+        result.append({'device': name, 'mac': row.get('address', ''),
+                       'state': row.get('operstate', 'UNKNOWN'),
+                       'admin_up': 'UP' in row.get('flags', []),
+                       'carrier': 'LOWER_UP' in row.get('flags', []),
+                       'kind': kind, 'addresses': addresses,
+                       'management': name == management,
+                       'configurable': name not in (management, security.WG) and kind not in ('vlan', 'wireguard', 'loopback')})
+    return {'interfaces': sorted(result, key=lambda row: (not row['management'], row['device']))}
+
+
 def fields(row, allowed):
     if not isinstance(row, dict) or set(row) - set(allowed.split()):
         raise Error('Campi di rete non validi')

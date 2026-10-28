@@ -315,6 +315,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             # Polling reads a short snapshot without waiting for service activation.
             if self.path=='/api/auth/status':return self.reply(200,{'enabled':bool(authentication.read(STATE)),'verified':self.mfa_session(),'csrf':CSRF})
+            if self.path=='/api/interfaces':return self.reply(200,networking.interface_inventory(MGMT,run))
             if self.path=='/api/status':
                 current=PENDING;pending=current.copy() if current else None;last=LAST
                 links=json.loads(run(['ip','-j','link']))

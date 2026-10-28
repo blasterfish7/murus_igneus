@@ -167,8 +167,8 @@ jobs:
             dist/signature-status.txt
             dist/bootstrap-provenance.json
             dist/clamav-build.log
-            dist/alpha9-iso-networking-qa.json
-            dist/alpha9-iso-console.log
+            dist/alpha10-iso-networking-qa.json
+            dist/alpha10-iso-console.log
           compression-level: 0
           retention-days: 2
 

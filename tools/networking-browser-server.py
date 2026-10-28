@@ -10,6 +10,11 @@ import server
 
 
 def read_only(args, *a, **kw):
+    if args == ['ip', '-j', '-d', 'address', 'show']:
+        return json.dumps([{'ifname':'lo','link_type':'loopback'},
+                           {'ifname':'eth0','address':'02:00:00:00:00:10','link_type':'ether','flags':['UP','LOWER_UP'],'operstate':'UP','addr_info':[{'family':'inet','local':'192.0.2.10','prefixlen':24}]},
+                           {'ifname':'eth1','address':'02:00:00:00:00:11','link_type':'ether','flags':['UP','LOWER_UP'],'operstate':'UP','addr_info':[]},
+                           {'ifname':'eth2','address':'02:00:00:00:00:12','link_type':'ether','flags':[],'operstate':'DOWN','addr_info':[]}])
     if args == ['ip', '-j', 'link']:
         return json.dumps([{'ifname': name} for name in ('lo', 'eth0', 'eth1', 'eth2')])
     raise ValueError('System command disabled in browser fixture')
