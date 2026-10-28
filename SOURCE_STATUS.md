@@ -1,3 +1,17 @@
+# Alpha.10 acceptance — 2026-10-28 UTC
+
+Tested source: `a5249d17f0a50e3aa45195b50d7ba6be8c7e856a`. [CI run 40662424590 passed](https://github.com/blasterfish7/murus_igneus/actions/runs/40662424590): 231 Python tests without skips, 19 Chromium checks, management TLS/transaction-lock fixture, 13 native / 9 enterprise / 23 parental / 6 DHCP WAN and anti-lockout packet checks and four real HTTPS category downloads.
+
+The original Devuan ISO passed 67 UEFI checks, including external management HTTPS, console discovery, confirmed installation onto a dedicated blank 16 GiB virtual disk and autonomous disk boot with the ISO detached. The backend serves HTTPS after disk boot and correctly identifies the installed system.
+
+Adds hardware NIC inventory independent of the draft, a DHCP WAN client with validated leases/owned routes, a default-route shortcut, mandatory first-login password change, a single root password authority shared by web/console, preservation of the live password during disk installation and protected anti-lockout management access. Retains family profiles with named devices, SafeSearch/YouTube, study/night schedules, persistent temporary bonuses, automatic validated list refresh and an explicit whole-LAN IPv6 guard. Administration gains grouped searchable navigation, local light/dark themes, responsive layout and expandable family cards. Live setup exposes web/console installation and real access URLs. No Fortinet code or firmware.
+
+ISO: 475052032 bytes, SHA256 `c60bbab52010d09e1dd283eba6a204e400b6606b99b1b9ec314731f943fcffaa`. DEB: 121764 bytes, SHA256 `1954d47f9e0f878c7641cf5def9274e234c88abe932bdc36f5a0ebbdb205e710`.
+
+Original validated assets are staged privately; publication is pending source/asset verification. See [ALPHA10](docs/ALPHA10.md), [ISO QA](docs/ISO-ALPHA10-QA.md) and [structured summary](docs/qa/alpha10-validation.json). Only QA documentation is added after the tested source. Physical hardware, BIOS/Secure Boot, full UTM efficacy and live OpenAI calls are not certified.
+
+---
+
 # Published release — 0.3.0-alpha.9
 
 PR #11 is merged. [Download alpha.9](https://github.com/blasterfish7/murus_igneus/releases/tag/v0.3.0-alpha.9): original tested ISO, DEB, guide, checksums and acceptance/provenance manifests. Earlier published releases and candidate drafts are unchanged.

@@ -5,7 +5,7 @@ import json
 import re
 import shlex
 
-VERSION='0.3.0-alpha.9'  # single runtime source; __init__.py must match (see tests/test_hardening.py)
+VERSION='0.3.0-alpha.10'  # single runtime source; __init__.py must match (see tests/test_hardening.py)
 
 class Error(ValueError): pass
 
@@ -73,7 +73,7 @@ table inet murus_igneus {{
   iifname "lo" accept
   ct state invalid drop
   ct state established,related accept
-  iifname {Q(management)} tcp dport 8443 accept
+  iifname {Q(management)} tcp dport 8443 accept comment "Murus anti-lockout HTTPS"
   iifname {Q(management)} udp sport 67 udp dport 68 accept
   iifname {Q(management)} ip protocol icmp accept
  }}

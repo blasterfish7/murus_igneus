@@ -1,6 +1,5 @@
 """Murus Igneus local management service. SPDX-License-Identifier: MIT."""
 import base64
-import hashlib
 import hmac
 import ipaddress
 import json
@@ -281,16 +280,18 @@ class Handler(BaseHTTPRequestHandler):
         super().setup()
     def log_message(self,*_):pass
     def auth(self):
-        try:expected='admin:'+(STATE/'admin.password').read_text().strip()
-        except OSError:self.reply(503,{'error':'Credenziali non disponibili'});return False
         try:
             h=self.headers.get('Authorization','');actual=base64.b64decode(h[6:],validate=True).decode() if h.startswith('Basic ') else ''
         except Exception:actual=''
         peer=self.client_address[0]
-        correct=hmac.compare_digest(hashlib.sha256(actual.encode()).digest(),hashlib.sha256(expected.encode()).digest())
+        try:correct=not password_blocked(peer) and actual.startswith('admin:') and authentication.check_password(STATE,actual[6:])
+        except (OSError,ValueError):self.reply(503,{'error':'Credenziali non disponibili'});return False
         if h and not password_attempt(peer,correct):
             body=json.dumps({'error':'Troppi tentativi: attendere un minuto'}).encode();self.send_response(429);self.send_header('Retry-After','60');self.send_header('Content-Type','application/json');self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body);return False
         if correct:
+            permitted=('/', '/app.js', '/management.js', '/network.js', '/enterprise.js', '/parental.js', '/style.css', '/api/auth/status', '/api/auth/verify', '/api/auth/password')
+            if authentication.password_status(STATE)['password_change_required'] and self.path not in permitted:
+                self.reply(403,{'error':'Cambiare la password iniziale prima di continuare','password_change_required':True});return False
             if authentication.read(STATE) and not self.mfa_session() and self.path not in ('/', '/app.js', '/management.js', '/network.js', '/enterprise.js', '/parental.js', '/style.css', '/api/auth/status', '/api/auth/verify'):
                 self.reply(403,{'error':'Inserire il codice TOTP', 'mfa_required':True});return False
             return True
@@ -314,11 +315,12 @@ class Handler(BaseHTTPRequestHandler):
         if not self.auth():return
         try:
             # Polling reads a short snapshot without waiting for service activation.
-            if self.path=='/api/auth/status':return self.reply(200,{'enabled':bool(authentication.read(STATE)),'verified':self.mfa_session(),'csrf':CSRF})
+            if self.path=='/api/auth/status':return self.reply(200,{'enabled':bool(authentication.read(STATE)),'verified':self.mfa_session(),'csrf':CSRF,**authentication.password_status(STATE)})
+            if self.path=='/api/interfaces':return self.reply(200,networking.interface_inventory(MGMT,run))
             if self.path=='/api/status':
                 current=PENDING;pending=current.copy() if current else None;last=LAST
                 links=json.loads(run(['ip','-j','link']))
-                return self.reply(200,{'version':VERSION,'csrf':CSRF,'management':MGMT,'links':[x['ifname'] for x in links if x['ifname'] not in (MGMT,'lo')],'last':last,'maintenance':jobs.busy(),'pending':{'id':pending['id'],'deadline':pending['deadline'],'remaining':max(0,pending['deadline']-time.time())} if pending else None})
+                return self.reply(200,{'version':VERSION,'csrf':CSRF,'management':MGMT,'anti_lockout':{'enabled':True,'interface':MGMT,'port':8443,'confirmation_seconds':90},'links':[x['ifname'] for x in links if x['ifname'] not in (MGMT,'lo')],'last':last,'maintenance':jobs.busy(),'pending':{'id':pending['id'],'deadline':pending['deadline'],'remaining':max(0,pending['deadline']-time.time())} if pending else None})
             with LOCK:
                 if self.path=='/api/events':self.reply(200,eventlog.history(STATE))
                 elif self.path in ('/api/parental/report/1','/api/parental/report/7'):self.reply(200,parental.reporting.report(STATE,int(self.path[-1])))
@@ -361,6 +363,9 @@ class Handler(BaseHTTPRequestHandler):
                     else:self.reply(200,parental.pause(data.get('id'),data.get('minutes')))
                 elif self.path=='/api/auth/verify':
                     self.mfa_cookie=authentication.authenticate(STATE,data.get('code'),self.client_address[0]);self.reply(200,{'ok':True})
+                elif self.path=='/api/auth/password':
+                    if PENDING or jobs.busy():raise Error('Attendere la fine della modifica o manutenzione prima del cambio password')
+                    self.reply(200,authentication.change_password(STATE,data.get('password'),data.get('confirmation')))
                 elif self.path=='/api/auth/enroll':self.reply(200,authentication.enroll(STATE))
                 elif self.path=='/api/auth/confirm':
                     self.mfa_cookie=authentication.confirm(STATE,data.get('code'),self.client_address[0]);self.reply(200,{'ok':True})
@@ -435,7 +440,7 @@ def make_server(host,port,cert,key):
 def main():
     global LAST,ACTIVE
     STATE.mkdir(mode=0o700,exist_ok=True);STATE.chmod(0o700)
-    if not (STATE/'admin.password').exists():atomic(STATE/'admin.password','igneus')
+    authentication.initialize_credentials(STATE)
     run(['nft','-f','-'],baseline(MGMT));run(['sysctl','-w','net.ipv4.ip_forward=0'])
     if (STATE/'active.json').exists():
         undo=[]

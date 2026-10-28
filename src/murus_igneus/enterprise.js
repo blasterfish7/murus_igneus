@@ -10,13 +10,14 @@
     <button id="enterprise-health" class="secondary">Stato attivo</button><pre id="enterprise-state"></pre>`;
   document.querySelector('main').append(section);
   const admin = document.createElement('section'); admin.id = 'admin-page'; admin.className = 'page'; admin.hidden = true;
-  admin.innerHTML = `<h2>Amministrazione e storico</h2><h3>Autenticazione a due fattori</h3><p>Password amministratore e TOTP a 6 cifre, sessione di 15 minuti. Conserva il segreto in modo sicuro. Recupero da console root: rimuovi /etc/murus_igneus/mfa.json e riavvia il servizio.</p>
+  admin.innerHTML = `<h2>Amministrazione e storico</h2><h3>Password web e console</h3><p>La password web dell’utente admin coincide con quella della console root. Anche un cambio da console con passwd viene riconosciuto dal web.</p><button type="button" id="password-open" class="secondary">Cambia password</button><h3>Autenticazione a due fattori</h3><p>Password amministratore e TOTP a 6 cifre, sessione di 15 minuti. Conserva il segreto in modo sicuro. Recupero da console root: rimuovi /etc/murus_igneus/mfa.json e riavvia il servizio.</p>
     <button id="mfa-status">Stato MFA</button><button id="mfa-enroll">Configura TOTP</button><p id="mfa-state"></p><pre id="mfa-secret"></pre>
     <form id="mfa-confirm"><label>Codice dell’app Authenticator<input id="mfa-code" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code" required></label><button>Conferma attivazione</button><button id="mfa-disable" type="button" class="secondary">Disabilita con un nuovo codice</button></form>
     <h3>Eventi persistenti</h3><p>Ultimi 1000 eventi; conservazione massima 30 giorni o 20.000 eventi. Include operazioni amministrative e log kernel policy/DNAT raccolti ogni 5 secondi. I limiti di frequenza e il buffer kernel possono omettere eventi. In modalità live lo storico si perde al riavvio.</p>
     <button id="events-refresh">Aggiorna storico</button><pre id="events-history"></pre>
     <h3>Aggiornamenti firmati</h3><p>La verifica dei pacchetti usa una chiave pubblica Ed25519 installata dall’amministratore. La chiave privata di firma non deve essere presente sul firewall. Usa murus-update da console per verificare, installare o ripristinare un pacchetto firmato.</p>`;
   document.querySelector('main').append(admin);
+  el('password-open').onclick=()=>{el('password-form').hidden=false;el('password-result').textContent='';show('password-page');};
   let tunnels = [];
   function field(parent, label, value, type = 'text') { const l = document.createElement('label'); l.textContent = label; const input = document.createElement('input'); input.type = type; input.value = value ?? ''; l.append(input); parent.append(l); return input; }
   function renderTunnels() {

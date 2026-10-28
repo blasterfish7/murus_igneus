@@ -78,6 +78,8 @@ def compile_config(config,management='eth0'):
     add('firewall policy',policies)
     routes=[]
     for r in rows('routes','id destination gateway interface distance priority enabled','id'):
+        if r['destination'] in ('0.0.0.0','default'):r['destination']='0.0.0.0/0'
+        if r['interface']==management and r['interface'] not in mapping:raise Error(management+' è riservata alla gestione: scegliere una interfaccia dati configurata')
         fields={'dst':subnet(r['destination']),'gateway':str(ip.IPv4Address(r['gateway'])),'device':r['interface'],'distance':str(r.get('distance',10)),'priority':str(r.get('priority',0)),'status':boolean(r,'enabled',True)}
         routes.append((r['id'],fields))
     add('router static',routes)

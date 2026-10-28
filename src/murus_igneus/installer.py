@@ -12,6 +12,23 @@ except ImportError:
 PREVIEW=None
 INSTALL_LOCK=Path('/run/murus-igneus-installer.lock')
 
+def preserve_root_password(target, source=Path('/etc/shadow')):
+    """Copy only the current root shadow record, never a factory password."""
+    destination = Path(target)/'etc/shadow'
+    if destination.is_symlink():raise Error('Shadow di destinazione non valido')
+    root = [line for line in Path(source).read_text().splitlines() if line.startswith('root:')]
+    if len(root)!=1 or len(root[0].split(':'))!=9:raise Error('Password console non disponibile')
+    lines = destination.read_text().splitlines()
+    if sum(line.startswith('root:') for line in lines)!=1:raise Error('Account root di destinazione non valido')
+    info = destination.stat();temporary = destination.with_name('.shadow.murus')
+    try:
+        fd=os.open(temporary,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+        with os.fdopen(fd,'w') as stream:stream.write('\n'.join(root[0] if line.startswith('root:') else line for line in lines)+'\n')
+        os.chown(temporary,info.st_uid,info.st_gid);temporary.chmod(info.st_mode&0o777);temporary.replace(destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def command(args):return subprocess.check_output(args,text=True,timeout=20)
 def live():return Path('/etc/murus_igneus/live-image').exists() and Path('/run/live/medium/live/filesystem.squashfs').is_file()
 def inventory():
@@ -74,6 +91,7 @@ def _install(disk,log):
                 dest=target/name.lstrip('/');dest.mkdir(parents=True,exist_ok=True)
                 run(['rsync','-aHAX','--numeric-ids',name+'/',str(dest)+'/'])
         run(['rsync','-a','/etc/default/murus-igneus',str(target/'etc/default/murus-igneus')])
+        preserve_root_password(target)
         (target/'etc/murus_igneus/live-image').unlink(missing_ok=True)
         (target/'boot/efi').mkdir(parents=True,exist_ok=True);mount([part(2)],target/'boot/efi')
         uuid=command(['blkid','-s','UUID','-o','value',part(3)]).strip();efi=command(['blkid','-s','UUID','-o','value',part(2)]).strip()

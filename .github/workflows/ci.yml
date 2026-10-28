@@ -88,6 +88,23 @@ jobs:
           path: dist/native-networking-qa.json
           retention-days: 14
 
+  dhcp-client-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install DHCP WAN and anti-lockout lab tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends nftables iproute2 conntrack dnsmasq-base udhcpc
+      - name: Exercise DHCP acquisition, renewal, rollback, expiry and protected management
+        run: sudo env MURUS_LAB=YES unshare --mount --net --fork python3 tools/validate-dhcp-client-runtime.py
+      - name: Save DHCP client acceptance report
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: murus-dhcp-client-qa
+          path: dist/dhcp-client-runtime-qa.json
+          retention-days: 14
+
   enterprise-runtime:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -136,7 +153,7 @@ jobs:
   devuan-iso:
     permissions:
       contents: write
-    needs: [tests, network-runtime, enterprise-runtime, parental-runtime]
+    needs: [tests, network-runtime, enterprise-runtime, parental-runtime, dhcp-client-runtime]
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     timeout-minutes: 60
@@ -167,8 +184,8 @@ jobs:
             dist/signature-status.txt
             dist/bootstrap-provenance.json
             dist/clamav-build.log
-            dist/alpha9-iso-networking-qa.json
-            dist/alpha9-iso-console.log
+            dist/alpha10-iso-networking-qa.json
+            dist/alpha10-iso-console.log
           compression-level: 0
           retention-days: 2
 

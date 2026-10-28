@@ -8,10 +8,11 @@ import time
 
 try:
     from .migration import Error
-    from . import security
+    from . import security, dhcp_client
 except ImportError:
     from migration import Error
     import security
+    import dhcp_client
 
 EXTRA = ('dhcp', 'dns', 'port_forwards', 'dhcp_reservations')
 VLAN_ALIAS = 'murus-igneus-vlan'
@@ -19,6 +20,33 @@ VLAN_ALIAS = 'murus-igneus-vlan'
 
 def defaults():
     return {'dhcp_reservations': [], 'dhcp': [], 'dns': {'enabled': False, 'interfaces': [], 'upstream_servers': [], 'domain': 'lan'}, 'port_forwards': []}
+
+
+def interface_inventory(management, runner):
+    """Read kernel interfaces, including the reserved management port; never configure them."""
+    rows = json.loads(runner(['ip', '-j', '-d', 'address', 'show']))
+    result = []
+    for row in rows:
+        name = row.get('ifname', '')
+        if not name or name == 'lo':
+            continue
+        addresses = []
+        for entry in row.get('addr_info', []):
+            if entry.get('family') not in ('inet', 'inet6'):
+                continue
+            try:
+                addresses.append(str(ip.ip_interface(str(entry['local']) + '/' + str(entry['prefixlen']))))
+            except (KeyError, ValueError):
+                continue
+        kind = row.get('linkinfo', {}).get('info_kind', row.get('link_type', 'unknown'))
+        result.append({'device': name, 'mac': row.get('address', ''),
+                       'state': row.get('operstate', 'UNKNOWN'),
+                       'admin_up': 'UP' in row.get('flags', []),
+                       'carrier': 'LOWER_UP' in row.get('flags', []),
+                       'kind': kind, 'addresses': addresses,
+                       'management': name == management,
+                       'configurable': name not in (management, security.WG) and kind not in ('vlan', 'wireguard', 'loopback')})
+    return {'interfaces': sorted(result, key=lambda row: (not row['management'], row['device']))}
 
 
 def fields(row, allowed):
@@ -67,10 +95,27 @@ def prepare(config, management):
     original = copy.deepcopy(interfaces)
     physical = set()
     for row in interfaces:
-        fields(row, 'name device address parent vlan_id')
+        fields(row, 'name device address parent vlan_id address_mode dhcp_metric')
         dev = row.get('device')
         if not row.get('parent') and row.get('vlan_id') is None:
             physical.add(dev)
+    clients = []
+    for row in interfaces:
+        mode = row.pop('address_mode', 'static')
+        metric = row.pop('dhcp_metric',100)
+        if mode not in ('static','dhcp'):
+            raise Error('Modalità IPv4 non valida: scegliere static o dhcp')
+        integer(metric,1,65535)
+        if mode == 'dhcp':
+            device(row.get('device'),management)
+            if row.get('address'):
+                raise Error('DHCP client richiede il campo IPv4 statico vuoto')
+            clients.append(row['name'])
+    if len(clients) > 1:
+        raise Error('È supportata una WAN DHCP; la doppia WAN richiede porte statiche')
+    for route in c.get('routes', []):
+        if route.get('interface') in clients:
+            raise Error('La WAN DHCP acquisisce il gateway automaticamente; usare una porta statica per rotte statiche')
     vlans = []; tags = set()
     for row in interfaces:
         parent = row.pop('parent', '')
@@ -194,6 +239,8 @@ def decorate(plan, original, settings, vlans):
     plan['network_ops'] = vlans + plan['network_ops']
     script = plan['nftables']; inputs = []; forwards = []; nat = []
     ports = {r['name']: r for r in original}
+    for row in original:
+        if row.get('address_mode') == 'dhcp':inputs.append('add rule inet murus_igneus input iifname '+json.dumps(row['device'])+' udp sport 67 udp dport 68 counter accept')
     for row in settings['dhcp']:
         if enabled(row):
             dev = json.dumps(ports[row['interface']]['device'])
@@ -259,11 +306,13 @@ def dnsmasq_config(settings, management):
 
 
 def stop():
+    dhcp_client.stop()
     security.stop('dnsmasq')
 
 
 def activate(settings, management):
     stop()
+    dhcp_client.start(settings,management)
     text = dnsmasq_config(settings, management)
     if not text:
         return
@@ -289,4 +338,4 @@ def health():
                     leases.append({'expires': values[0], 'mac': values[1], 'address': values[2], 'hostname': values[3]})
     except FileNotFoundError:
         pass
-    return {'running': bool(process and process.poll() is None), 'leases': leases}
+    return {'running': bool(process and process.poll() is None), 'leases': leases, 'dhcp_clients':dhcp_client.health()}
