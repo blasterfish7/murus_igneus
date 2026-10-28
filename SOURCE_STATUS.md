@@ -1,3 +1,14 @@
+# Published release — 0.3.0-alpha.9
+
+PR #11 is merged. [Download alpha.9](https://github.com/blasterfish7/murus_igneus/releases/tag/v0.3.0-alpha.9): original tested ISO, DEB, guide, checksums and acceptance/provenance manifests. Earlier published releases and candidate drafts are unchanged.
+
+Tag target: `7df5cfc45e3d13f446b26ed326d8850c8432c9da`; tested source: `5dc406daae89e20adb7a207597730b9ad88c8e46`. Only acceptance documentation differs at the release target. [Publisher run 40655623167](https://github.com/blasterfish7/murus_igneus/actions/runs/40655623167) verified successful CI, source ancestry, original ISO/DEB hashes, the 58-check ISO report, Devuan trust provenance, all 27 packaged application files, installed commands/init/profile and all ten asset digests. Current Google/YouTube provider VIPs were also resolved and verified before publication.
+
+ISO SHA256: `320bafcb10698890b6931d3441bfa0fdc592665aa4e64e8cc852bd486222fbfe`.
+DEB SHA256: `0567a75af44bd95b3a52b06764761bcb0070e586742e9cfc54d72b59a70babd6`.
+
+See [ALPHA9](docs/ALPHA9.md), [ISO QA](docs/ISO-ALPHA9-QA.md) and [parental/reporting](docs/PARENTAL.md).
+
 # Alpha.9 acceptance — 2026-10-28 UTC
 
 Tested source: `5dc406daae89e20adb7a207597730b9ad88c8e46`. [CI run 40653511277 passed](https://github.com/blasterfish7/murus_igneus/actions/runs/40653511277): 216 Python tests without skips, 14 Chromium checks, management TLS/transaction-lock fixture, 13 native / 9 enterprise / 23 parental packet checks and four real HTTPS category downloads.
@@ -8,7 +19,7 @@ Adds family profiles with named devices, SafeSearch/YouTube, study/night schedul
 
 ISO: 475041792 bytes, SHA256 `320bafcb10698890b6931d3441bfa0fdc592665aa4e64e8cc852bd486222fbfe`. DEB: 115640 bytes, SHA256 `0567a75af44bd95b3a52b06764761bcb0070e586742e9cfc54d72b59a70babd6`.
 
-Original validated assets are staged privately; publication is pending source/asset verification. See [ALPHA9](docs/ALPHA9.md), [ISO QA](docs/ISO-ALPHA9-QA.md) and [structured summary](docs/qa/alpha9-validation.json). Only QA documentation is added after the tested source. Physical hardware, BIOS/Secure Boot, full UTM efficacy and live OpenAI calls are not certified.
+Original validated assets are now published without rebuilding; publication verified source/asset correspondence. See [ALPHA9](docs/ALPHA9.md), [ISO QA](docs/ISO-ALPHA9-QA.md) and [structured summary](docs/qa/alpha9-validation.json). Only QA documentation is added after the tested source. Physical hardware, BIOS/Secure Boot, full UTM efficacy and live OpenAI calls are not certified.
 
 ---
 
