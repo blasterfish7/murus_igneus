@@ -1,0 +1,63 @@
+{
+  "version": "0.3.0-alpha.10",
+  "source_sha": "a5249d17f0a50e3aa45195b50d7ba6be8c7e856a",
+  "run_id": 40662424590,
+  "python_tests": 231,
+  "python_skips": 0,
+  "chromium_checks": 19,
+  "native_packet_checks": 13,
+  "enterprise_packet_checks": 9,
+  "parental_packet_checks": 23,
+  "real_https_category_feeds": 4,
+  "dhcp_client_packet_checks": 6,
+  "mandatory_first_login": true,
+  "shared_root_web_password": true,
+  "console_password_change_recognized_by_web": true,
+  "installed_password_preserved": true,
+  "anti_lockout_packet_test": true,
+  "management_tls_lock_fixture": true,
+  "iso_uefi_checks": 67,
+  "external_management_https": true,
+  "console_disk_install": true,
+  "autonomous_uefi_disk_boot_without_iso": true,
+  "iso_sha256": "c60bbab52010d09e1dd283eba6a204e400b6606b99b1b9ec314731f943fcffaa",
+  "iso_size": 475052032,
+  "deb_sha256": "1954d47f9e0f878c7641cf5def9274e234c88abe932bdc36f5a0ebbdb205e710",
+  "deb_size": 121764,
+  "scope": "Disposable network namespaces and QEMU TCG UEFI live ISO, external management HTTPS, installation onto a dedicated blank 16 GiB virtual disk and independent disk boot. No physical hardware, BIOS/Secure Boot or full UTM efficacy claim.",
+  "candidate_release_id": 426467921,
+  "assets": {
+    "alpha10-iso-networking-qa.json": {
+      "size": 6768,
+      "sha256": "563734b3094a0be3ed44e38ef323a671fba6d3b26c23e4c197659e84e288abe6"
+    },
+    "bootstrap-provenance.json": {
+      "size": 833,
+      "sha256": "bb21f6a41f9a409f9cde3a98edf2f2dc49a18aaee5dbf9ed872dce7cacc92cc6"
+    },
+    "candidate-validation.json": {
+      "size": 1153,
+      "sha256": "131daec34d1cc08b4b454db28c464c76af3e04b15fa2b214316109c1140922c9"
+    },
+    "murus-igneus-0.3.0-alpha.10-devuan-amd64.iso": {
+      "size": 475052032,
+      "sha256": "c60bbab52010d09e1dd283eba6a204e400b6606b99b1b9ec314731f943fcffaa"
+    },
+    "murus-igneus_0.3.0-alpha.10_all.deb": {
+      "size": 121764,
+      "sha256": "1954d47f9e0f878c7641cf5def9274e234c88abe932bdc36f5a0ebbdb205e710"
+    },
+    "packages-devuan.tsv": {
+      "size": 9650,
+      "sha256": "23626300dc0f181385c25569eca1f078b698dc7bb287e1c453634878cb5f04ce"
+    },
+    "SHA256SUMS": {
+      "size": 111,
+      "sha256": "cdf9b67fed5ac973205c655b81049587c9c09909dccd344901a5e5233791c805"
+    },
+    "signature-status.txt": {
+      "size": 57,
+      "sha256": "5db8636adba8ad2b58951db44644e4c07fa0705570adecdba0f2af969790e484"
+    }
+  }
+}
