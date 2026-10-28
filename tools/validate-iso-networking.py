@@ -40,6 +40,7 @@ with tempfile.TemporaryDirectory(prefix='murus-iso-qa-') as work:
     child = pexpect.spawn(args[0], args[1:], encoding='utf-8', timeout=360)
     log = (ROOT / 'dist/alpha10-iso-console.log').open('w'); child.logfile = log
     try:
+        child.expect(r'login:',timeout=360)  # Drain serial boot output before probing HTTPS.
         # Complete the required password setup through external HTTPS before console login.
         credential_headers={'Authorization':'Basic '+base64.b64encode(b'admin:igneus').decode()}
         external='https://127.0.0.1:'+str(web_port)+'/api/'
@@ -58,7 +59,7 @@ with tempfile.TemporaryDirectory(prefix='murus-iso-qa-') as work:
         body=json.dumps({'password':QA_PASSWORD,'confirmation':QA_PASSWORD}).encode()
         with opener.open(urllib.request.Request(external+'auth/password',headers=credential_headers,data=body),timeout=30) as response:assert json.load(response)['ok']
         checks.append('Mandatory first-login password setup blocks configuration and changes the shared web/console password over real HTTPS');print('PASS '+checks[-1],flush=True)
-        child.expect(r'login:'); child.sendline('root'); child.expect('Password:'); child.sendline(QA_PASSWORD)
+        child.sendline('root'); child.expect('Password:'); child.sendline(QA_PASSWORD)
         child.expect(r'root@[^\r\n]*[#$] ')
         child.sendline("export PS1='MIQA# '")
         prompt = r'(?m)(?:^|\r|\n|\x1b\[\?2004h)MIQA# '
