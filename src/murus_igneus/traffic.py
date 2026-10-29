@@ -1,5 +1,6 @@
 """Bounded, read-only connection and policy event snapshots. SPDX-License-Identifier: MIT."""
 import re
+from pathlib import Path
 import subprocess
 import tempfile
 import time
@@ -73,4 +74,33 @@ def snapshot():
             result['truncated'] |= truncated or len(result[name]) >= MAX_ROWS
         except (OSError, ValueError, subprocess.TimeoutExpired) as error:
             result['errors'].append(name + ': ' + str(error)[:1000])
+    return result
+
+
+def system_snapshot(proc=Path('/proc')):
+    """Read kernel counters only; rate calculation belongs to the sampling client."""
+    result = {'sampled_at': time.monotonic(), 'cpu': None, 'memory': None,
+              'uptime': None, 'interfaces': [], 'errors': []}
+    for name in ('stat', 'meminfo', 'uptime', 'net/dev'):
+        try:
+            data = (proc / name).read_text()
+            if name == 'stat':
+                values = [int(v) for v in data.splitlines()[0].split()[1:9]]
+                if len(values) < 4:
+                    raise ValueError('Incomplete CPU counters')
+                result['cpu'] = {'total': sum(values), 'idle': values[3] + (values[4] if len(values) > 4 else 0)}
+            elif name == 'meminfo':
+                values = {line.split(':')[0]: int(line.split()[1]) * 1024 for line in data.splitlines() if ':' in line}
+                total, available = values['MemTotal'], values['MemAvailable']
+                result['memory'] = {'total': total, 'used': max(0, total - available)}
+            elif name == 'uptime':
+                result['uptime'] = float(data.split()[0])
+            else:
+                for line in data.splitlines()[2:]:
+                    device, counters = line.rsplit(':', 1)
+                    values = counters.split()
+                    if device.strip() != 'lo':
+                        result['interfaces'].append({'device': device.strip(), 'rx': int(values[0]), 'tx': int(values[8])})
+        except (OSError, ValueError, KeyError, IndexError):
+            result['errors'].append(name + ': dati non disponibili')
     return result
