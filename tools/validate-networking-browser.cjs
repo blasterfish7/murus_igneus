@@ -95,6 +95,7 @@ let browser, firstFixture;
   await page.locator('#update-signature').setInputFiles({name:'manifest.sig',mimeType:'application/octet-stream',buffer:Buffer.alloc(64)});
   await page.locator('#update-package').setInputFiles({name:'murus-igneus.deb',mimeType:'application/octet-stream',buffer:Buffer.from('controlled UI fixture')});
   await page.locator('#update-verify').click();await page.waitForFunction(()=>!document.getElementById('update-install-panel').hidden);
+  await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'Signed bundle digest overflows mobile preview');await page.setViewportSize({width:1440,height:1000});
   assert.equal(await page.locator('#update-install').isDisabled(),true);
   await page.locator('#update-install-text').fill('AGGIORNA 0.3.0~alpha.11');await page.locator('#update-install').click();
   await page.waitForFunction(()=>document.getElementById('update-job-state').textContent.includes('Backup in corso'));
