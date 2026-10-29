@@ -97,7 +97,8 @@ with tempfile.TemporaryDirectory(prefix='murus-update-runtime-') as temporary:
         api('updates/stage',tampered)
         raise AssertionError('Tampered package was accepted')
     except urllib.error.HTTPError as exc:
-        assert exc.code == 500
+        assert exc.code == 400
+        assert 'Checksum' in json.loads(exc.read())['error']
     checks.append('Actual HTTPS staging rejects a DEB whose digest differs from the Ed25519-signed manifest')
     preview = api('updates/stage',good)
     result = start('updates/install',{'id':preview['id'],'confirmation':preview['confirmation']})

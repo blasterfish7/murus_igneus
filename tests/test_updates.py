@@ -259,6 +259,9 @@ class UpdateTests(unittest.TestCase):
             self.assertEqual(request('/api/updates/stage',self.payload(),csrf=False)[0],403)
             status,body=request('/api/updates/stage',self.payload())
             self.assertEqual(status,200,body); self.assertEqual(body['version'],self.new)
+            tampered = {'files':{**self.payload()['files'],'murus-igneus.deb':base64.b64encode(b'altered').decode()}}
+            code,body=request('/api/updates/stage',tampered)
+            self.assertEqual(code,400); self.assertIn('Checksum',body['error'])
             with patch.object(updates,'blocked',return_value=True), patch.object(updates,'launch',return_value={'id':'recover'}) as launch:
                 code,body=request('/api/configuration/preview',{'configuration':{}})
                 self.assertNotEqual(code,200); self.assertIn('recupero',body['error'])
