@@ -17,11 +17,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 try:
     from .migration import VERSION, baseline, Error
     from .configuration import compile_config, from_backup, empty
-    from . import security, installer, jobs, assistant, switches, networking, traffic, enterprise, authentication, eventlog, parental
+    from . import security, installer, jobs, assistant, switches, networking, traffic, enterprise, authentication, eventlog, parental, updates
 except ImportError:
     from migration import VERSION, baseline, Error
     from configuration import compile_config, from_backup, empty
-    import security, installer, jobs, assistant, switches, networking, traffic, enterprise, authentication, eventlog, parental
+    import security, installer, jobs, assistant, switches, networking, traffic, enterprise, authentication, eventlog, parental, updates
 
 STATE=Path('/etc/murus_igneus');MGMT=os.environ.get('MURUS_MANAGEMENT_INTERFACE','eth0');LOCK=threading.RLock()
 if not re.fullmatch(r'[A-Za-z0-9_.-]{1,15}',MGMT) or MGMT=='lo':raise ValueError('Interfaccia di gestione non valida')
@@ -240,7 +240,7 @@ def rollback(ident):
 
 def apply(plan):
     global PENDING,LAST
-    if PENDING or jobs.busy():raise Error('Confermare la modifica o attendere la manutenzione in corso')
+    if PENDING or jobs.busy() or updates.blocked():raise Error('Confermare la modifica o attendere la manutenzione in corso')
     if (parental.TASK.status() or {}).get('state')=='running':raise Error('Attendere l’aggiornamento delle liste parental')
     if (switches.TASK.status() or {}).get('state')=='running':raise Error('Attendere l’operazione switch prima di applicare il firewall')
     if not plan or not plan['ready']:raise Error('Migrazione non validata o con incompatibilità')
@@ -316,12 +316,13 @@ class Handler(BaseHTTPRequestHandler):
         try:
             # Polling reads a short snapshot without waiting for service activation.
             if self.path=='/api/auth/status':return self.reply(200,{'enabled':bool(authentication.read(STATE)),'verified':self.mfa_session(),'csrf':CSRF,**authentication.password_status(STATE)})
+            if self.path=='/api/updates':return self.reply(200,updates.inventory())
             if self.path=='/api/dashboard':return self.reply(200,traffic.system_snapshot())
             if self.path=='/api/interfaces':return self.reply(200,networking.interface_inventory(MGMT,run))
             if self.path=='/api/status':
                 current=PENDING;pending=current.copy() if current else None;last=LAST
                 links=json.loads(run(['ip','-j','link']))
-                return self.reply(200,{'version':VERSION,'csrf':CSRF,'management':MGMT,'anti_lockout':{'enabled':True,'interface':MGMT,'port':8443,'confirmation_seconds':90},'links':[x['ifname'] for x in links if x['ifname'] not in (MGMT,'lo')],'last':last,'maintenance':jobs.busy(),'pending':{'id':pending['id'],'deadline':pending['deadline'],'remaining':max(0,pending['deadline']-time.time())} if pending else None})
+                return self.reply(200,{'version':VERSION,'csrf':CSRF,'management':MGMT,'anti_lockout':{'enabled':True,'interface':MGMT,'port':8443,'confirmation_seconds':90},'links':[x['ifname'] for x in links if x['ifname'] not in (MGMT,'lo')],'last':last,'maintenance':jobs.busy() or updates.blocked(),'pending':{'id':pending['id'],'deadline':pending['deadline'],'remaining':max(0,pending['deadline']-time.time())} if pending else None})
             with LOCK:
                 if self.path=='/api/events':self.reply(200,eventlog.history(STATE))
                 elif self.path in ('/api/parental/report/1','/api/parental/report/7'):self.reply(200,parental.reporting.report(STATE,int(self.path[-1])))
@@ -352,7 +353,17 @@ class Handler(BaseHTTPRequestHandler):
             data=json.loads(self.rfile.read(length))
             if not isinstance(data,dict):raise Error('Richiesta non valida')
             with LOCK:
-                if self.path in ('/api/parental/report/export','/api/parental/report/clear'):
+                if updates.blocked() and self.path not in ('/api/auth/verify','/api/updates/recover'):
+                    raise Error('Aggiornamento in corso o recupero richiesto: attendere o aprire Aggiornamenti')
+                if self.path in ('/api/updates/stage','/api/updates/install','/api/updates/rollback','/api/updates/recover'):
+                    if PENDING or jobs.busy() or (switches.TASK.status() or {}).get('state')=='running' or (parental.TASK.status() or {}).get('state')=='running':
+                        raise Error('Confermare le modifiche e attendere la fine delle altre operazioni')
+                    if self.path.endswith('/stage'):
+                        self.reply(200,updates.stage(data))
+                    else:
+                        self.reply(200,updates.launch(self.path.rsplit('/',1)[-1],data))
+                elif self.path=='/api/updates/check':self.reply(200,updates.releases(data.get('channel')))
+                elif self.path in ('/api/parental/report/export','/api/parental/report/clear'):
                     if self.path.endswith('/clear'):
                         if data.get('confirm') is not True:raise Error('Conferma cancellazione richiesta')
                         self.reply(200,parental.clear_report(STATE))
@@ -467,11 +478,13 @@ def main():
     if not cert.exists() or not key.exists():
         run(['openssl','req','-x509','-newkey','rsa:2048','-sha256','-nodes','-days','3650','-subj','/CN=murus_igneus.local','-keyout',str(key),'-out',str(cert)]);key.chmod(0o600)
     eventlog.start(STATE);parental.reporting.start_retention(STATE)
-    make_server('0.0.0.0',8443,cert,key).serve_forever()
+    web=make_server('0.0.0.0',8443,cert,key)
+    updates.mark_health(ACTIVE is not None or not (STATE/'active.json').exists())
+    web.serve_forever()
 
 
 # Background feed refresh must not overlap pending confirmation or maintenance.
-parental.UPDATE_ALLOWED = lambda: PENDING is None and not jobs.busy()
+parental.UPDATE_ALLOWED = lambda: PENDING is None and not jobs.busy() and not updates.blocked()
 
 if __name__=='__main__':
     def terminate(signum,frame):raise SystemExit(0)

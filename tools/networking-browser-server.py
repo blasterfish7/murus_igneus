@@ -26,6 +26,9 @@ def no_apply(*args, **kwargs):
 
 with tempfile.TemporaryDirectory(prefix='murus-browser-fixture-') as state:
     server.STATE = Path(state); (server.STATE / 'admin.password').write_text('test-browser')
+    server.updates.CACHE=server.STATE/'update-cache'
+    server.updates.STATE=server.STATE
+    server.updates.launch=no_apply
     if '--first-login' in sys.argv:
         shadow = server.STATE / 'test-shadow'
         shadow.write_text('root:'+server.authentication.password_hash('igneus','$6$fixture$')+':0:0:99999:7:::\n')
