@@ -97,6 +97,14 @@ class UpdateTests(unittest.TestCase):
         self.assertEqual(self.version,self.new)
         self.assertEqual(updates.read(self.cache/'status.json')['state'],'succeeded')
 
+    def test_signing_helper_emits_only_the_three_bundle_files(self):
+        target = self.root/'signed-output'
+        helper = Path(__file__).resolve().parents[1]/'tools/sign-update-bundle.py'
+        package = self.root/'new.deb'
+        subprocess.run([sys.executable,str(helper),str(package),'--key',str(self.private),'--output',str(target)],check=True,capture_output=True)
+        self.assertEqual({path.name for path in target.iterdir()},{'manifest.json','manifest.sig','murus-igneus.deb'})
+        self.assertEqual(updates.verify(target,self.key)['version'],self.new)
+
     def test_real_signature_stage_does_not_install_and_has_private_files(self):
         result = updates.stage(self.payload())
         self.assertEqual(result['version'], self.new)
