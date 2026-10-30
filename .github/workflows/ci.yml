@@ -184,15 +184,22 @@ jobs:
             dist/signature-status.txt
             dist/bootstrap-provenance.json
             dist/clamav-build.log
-            dist/alpha10-iso-networking-qa.json
-            dist/alpha10-iso-console.log
+            dist/alpha11-iso-networking-qa.json
+            dist/alpha11-iso-console.log
           compression-level: 0
           retention-days: 2
 
 
 
       - name: Preserve tested ISO in a private draft if Actions storage is full
-        if: success() && steps.upload_iso.outcome == 'failure' && github.event_name == 'push'
+        if: success() && steps.upload_iso.outcome == 'failure' && github.event_name == 'push' && !contains(github.event.head_commit.message, '[publish alpha.11]')
         env:
           GH_TOKEN: ${{ github.token }}
+        run: python3 tools/stage-candidate-release.py
+
+      - name: Publish alpha.11 only after all tests and original ISO acceptance
+        if: success() && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[publish alpha.11]')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MURUS_PUBLISH_RELEASE: 0.3.0-alpha.11
         run: python3 tools/stage-candidate-release.py

@@ -71,7 +71,7 @@ done
 chroot "$root" apt-get update
 chroot "$root" apt-get install -y --no-install-recommends linux-image-amd64 live-boot initramfs-tools sysvinit-core openrc ifupdown isc-dhcp-client kmod python3 python3-yaml snmp dnsmasq-base udhcpc nftables iproute2 openssl conntrack wireguard-tools strongswan-charon strongswan-swanctl libcharon-extra-plugins libstrongswan-standard-plugins iputils-ping dpkg-repack suricata suricata-update clamav clamav-daemon clamav-freshclam rsync fdisk parted dosfstools e2fsprogs grub-pc-bin grub-efi-amd64-bin grub2-common ca-certificates tzdata curl
 bash "$project/packaging/devuan/build-deb.sh" "$out"
-cp "$out/murus-igneus_0.3.0~alpha.10_all.deb" "$root/tmp/murus.deb"
+cp "$out/murus-igneus_0.3.0~alpha.11_all.deb" "$root/tmp/murus.deb"
 chroot "$root" dpkg -i /tmp/murus.deb
 rm "$root/tmp/murus.deb"
 cp "$out/bootstrap-provenance.json" "$root/usr/share/doc/murus-igneus/bootstrap-provenance.json"
@@ -101,7 +101,7 @@ NETWORK
 mkdir -p "$root/etc/dhcp/dhclient-enter-hooks.d" "$root/etc/murus_igneus"
 printf 'if [ "$interface" = eth0 ]; then new_routers=""; fi\n' > "$root/etc/dhcp/dhclient-enter-hooks.d/murus-management"
 printf 'timeout 10;\nretry 30;\ninitial-interval 1;\n' > "$root/etc/dhcp/dhclient.conf"
-printf 'Murus Igneus 0.3.0-alpha.10 — Devuan 6\nGestione da un altro PC: https://\\4{eth0}:8443 (utente admin; password iniziale igneus da cambiare)\nPassword iniziale console root: igneus, cambio obbligatorio. Dopo login: murus-info mostra gli indirizzi; murus-install avvia l’installazione guidata da console.\n\n' > "$root/etc/issue"
+printf 'Murus Igneus 0.3.0-alpha.11 — Devuan 6\nGestione da un altro PC: https://\\4{eth0}:8443 (utente admin; password iniziale igneus da cambiare)\nPassword iniziale console root: igneus, cambio obbligatorio. Dopo login: murus-info mostra gli indirizzi; murus-install avvia l’installazione guidata da console.\n\n' > "$root/etc/issue"
 printf 'root:igneus\n' | chroot "$root" chpasswd
 printf '{"system_root":true,"must_change":false}\n' > "$root/etc/murus_igneus/credentials.json"
 chroot "$root" chage -d 0 root
@@ -140,13 +140,13 @@ set timeout=2
 serial --unit=0 --speed=115200
 terminal_input console serial
 terminal_output console serial
-menuentry 'Murus Igneus 0.3.0-alpha.10 / Devuan 6 (live + web installer)' {
+menuentry 'Murus Igneus 0.3.0-alpha.11 / Devuan 6 (live + web installer)' {
   linux /boot/vmlinuz boot=live ip=frommedia net.ifnames=0 console=tty0 console=ttyS0,115200
   initrd /boot/initrd
 }
 GRUB
-grub-mkrescue --compress=xz -o "$out/murus-igneus-0.3.0-alpha.10-devuan-amd64.iso" "$iso"
-(cd "$out" && sha256sum murus-igneus-0.3.0-alpha.10-devuan-amd64.iso > SHA256SUMS)
+grub-mkrescue --compress=xz -o "$out/murus-igneus-0.3.0-alpha.11-devuan-amd64.iso" "$iso"
+(cd "$out" && sha256sum murus-igneus-0.3.0-alpha.11-devuan-amd64.iso > SHA256SUMS)
 echo 'MURUS ISO BUILD COMPLETE'
 
 

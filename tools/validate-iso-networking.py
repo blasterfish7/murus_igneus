@@ -18,7 +18,7 @@ import pexpect
 
 ROOT = Path(__file__).resolve().parents[1]
 assert os.environ.get('MURUS_LAB') == 'YES', 'Explicit disposable VM flag required'
-iso = ROOT / 'dist/murus-igneus-0.3.0-alpha.10-devuan-amd64.iso'
+iso = ROOT / 'dist/murus-igneus-0.3.0-alpha.11-devuan-amd64.iso'
 assert iso.is_file()
 firmware = Path('/usr/share/OVMF')
 code = firmware / 'OVMF_CODE_4M.fd'; template = firmware / 'OVMF_VARS_4M.fd'
@@ -38,7 +38,7 @@ with tempfile.TemporaryDirectory(prefix='murus-iso-qa-') as work:
     for index in range(3):
         args += ['-netdev', f'user,id=n{index}'+(f',hostfwd=tcp:127.0.0.1:{web_port}-:8443' if index==0 else ''), '-device', f'virtio-net-pci,netdev=n{index},romfile=']
     child = pexpect.spawn(args[0], args[1:], encoding='utf-8', timeout=360)
-    log = (ROOT / 'dist/alpha10-iso-console.log').open('w'); child.logfile = log
+    log = (ROOT / 'dist/alpha11-iso-console.log').open('w'); child.logfile = log
     try:
         child.expect(r'login:',timeout=360)  # Drain serial boot output before probing HTTPS.
         # Complete the required password setup through external HTTPS before console login.
@@ -113,7 +113,7 @@ for i in range(60):
  try:s=api('status');break
  except OSError:time.sleep(2)
 else:raise AssertionError('HTTPS backend not ready')
-assert s['version']=='0.3.0-alpha.10',s
+assert s['version']=='0.3.0-alpha.11',s
 # A separate loopback source verifies the real TLS/Basic gate without locking out the QA client.
 def auth_probe(password):
  conn=http.client.HTTPSConnection('127.0.0.1',8443,context=ssl._create_unverified_context(),source_address=('127.0.0.2',0),timeout=10)
@@ -121,7 +121,7 @@ def auth_probe(password):
  conn.request('GET','/api/status',headers={'Authorization':header});r=conn.getresponse();result=(r.status,r.getheader('Retry-After'));r.read();conn.close();return result
 for attempt in range(10):assert auth_probe('controlled-incorrect-password')[0]==401
 assert auth_probe(QA_PASSWORD)==(429,'60')
-assert api('status')['version']=='0.3.0-alpha.10'
+assert api('status')['version']=='0.3.0-alpha.11'
 print('ISO_HTTPS_BASIC_THROTTLE_OK')
 devices=api('interfaces')['interfaces'];assert {row['device'] for row in devices}>={'eth0','eth1','eth2'},devices
 mgmt=next(row for row in devices if row['device']==s['management']);assert mgmt['management'] and not mgmt['configurable'] and mgmt['addresses'],mgmt
@@ -159,7 +159,7 @@ print('ISO_ROOT_PARENTAL_APPLY_ROLLBACK_OK')
         command("python3 -c \"import base64;exec(base64.b64decode('" + encoded + "'))\"")
         checks.append('Real HTTPS authentication rejects ten wrong passwords, throttles further credentials and isolates peers'); print('PASS ' + checks[-1], flush=True)
         checks.append('Real HTTPS interface inventory includes all three Virtio NICs, management reservation, MAC and actual addresses'); print('PASS ' + checks[-1], flush=True)
-        checks.append('Real HTTPS backend alpha.10, empty setup and native VLAN preview'); print('PASS ' + checks[-1], flush=True)
+        checks.append('Real HTTPS backend alpha.11, empty setup and native VLAN preview'); print('PASS ' + checks[-1], flush=True)
         checks.append('Real appliance HTTPS preview/apply starts owned strongSwan and rollback stops it'); print('PASS ' + checks[-1], flush=True)
         checks.append('Real appliance HTTPS parental apply starts resolver and rollback stops it'); print('PASS ' + checks[-1], flush=True)
         remote=urllib.request.build_opener(urllib.request.ProxyHandler({}),urllib.request.HTTPSHandler(context=ssl._create_unverified_context()))
@@ -240,7 +240,7 @@ print('ISO_ROOT_PARENTAL_APPLY_ROLLBACK_OK')
         for attempt in range(60):
             try:
                 status=json.loads(web('api/status'))
-                if status['version']=='0.3.0-alpha.10':break
+                if status['version']=='0.3.0-alpha.11':break
             except OSError:pass
             time.sleep(2)
         else:raise AssertionError('Installed disk HTTPS unavailable')
@@ -261,7 +261,7 @@ print('ISO_ROOT_PARENTAL_APPLY_ROLLBACK_OK')
         with iso.open('rb') as file:
             digest = hashlib.file_digest(file, 'sha256').hexdigest()
         result = {'success': True, 'checks': checks, 'iso': iso.name, 'sha256': digest, 'scope': 'QEMU TCG UEFI live boot; installed product modules exercised with real packets inside isolated guest namespaces. Explicit console installation on a fresh 16 GiB virtual disk and autonomous UEFI disk boot with management HTTPS verified. No BIOS, Secure Boot or physical hardware test.'}
-        (ROOT / 'dist/alpha10-iso-networking-qa.json').write_text(json.dumps(result, indent=2) + '\n')
+        (ROOT / 'dist/alpha11-iso-networking-qa.json').write_text(json.dumps(result, indent=2) + '\n')
     finally:
         if child.isalive():
             child.terminate(force=True)

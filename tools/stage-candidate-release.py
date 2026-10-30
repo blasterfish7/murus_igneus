@@ -1,4 +1,4 @@
-"""Preserve a validated candidate when Actions storage is full. Never publish a release."""
+"""Preserve validated candidates; explicitly gated alpha.11 distribution after CI."""
 import hashlib
 import json
 import os
@@ -20,6 +20,10 @@ assert re.fullmatch(r'0\.3\.0-alpha\.[0-9]+',VERSION)
 LABEL=VERSION.removeprefix('0.3.0-').replace('.','')
 ISO_CHECKS=73
 API = 'https://api.github.com/repos/' + REPO
+PUBLISH = os.environ.get('MURUS_PUBLISH_RELEASE')
+if PUBLISH:
+    assert PUBLISH == VERSION == '0.3.0-alpha.11'
+    assert os.environ['GITHUB_REF'] == 'refs/heads/main'
 
 
 def request(url, data=None, method='GET', content_type='application/json'):
@@ -42,18 +46,38 @@ assert qa['iso'] == iso.name and qa['sha256'] == digest
 assert (out / 'SHA256SUMS').read_text().strip() == digest + '  ' + iso.name
 files = [iso, out / ('murus-igneus_'+VERSION.replace('-','~',1)+'_all.deb'), out / (LABEL+'-iso-networking-qa.json'),
          out / 'SHA256SUMS', out / 'packages-devuan.tsv', out / 'signature-status.txt', out / 'bootstrap-provenance.json']
+if PUBLISH:
+    guide = out / 'MURUS-IGNEUS-ALPHA11-LEGGIMI.md'
+    guide.write_bytes((ROOT / 'docs/ALPHA11.md').read_bytes())
+    update_guide = out / 'UPDATES.md'
+    update_guide.write_bytes((ROOT / 'docs/UPDATES.md').read_bytes())
+    files.extend([guide, update_guide])
+    # The ISO validator checks the original single-ISO checksum file first.
+    sums = []
+    for file in files:
+        if file.name != 'SHA256SUMS':
+            with file.open('rb') as stream:
+                sums.append(hashlib.file_digest(stream, 'sha256').hexdigest() + '  ' + file.name.replace('~', '-'))
+    (out / 'SHA256SUMS').write_text('\n'.join(sums) + '\n')
 manifest = {'source_sha': SHA, 'run_id': RUN, 'iso_checks': ISO_CHECKS, 'files': {}}
 for file in files:
     assert file.is_file() and file.stat().st_size > 0
     with file.open('rb') as f:
         manifest['files'][file.name.replace('~', '-')] = {'size': file.stat().st_size, 'sha256': hashlib.file_digest(f, 'sha256').hexdigest()}
 manifest_path = out / 'candidate-validation.json'; manifest_path.write_text(json.dumps(manifest, indent=2) + '\n'); files.append(manifest_path)
-tag = 'candidate-'+LABEL+'-' + SHA[:12] + '-' + RUN
+tag = 'v'+VERSION if PUBLISH else 'candidate-'+LABEL+'-' + SHA[:12] + '-' + RUN
 existing = request(API + '/releases?per_page=100')
 release = next((r for r in existing if r['tag_name'] == tag), None)
 if release is None:
-    body = {'tag_name': tag, 'target_commitish': SHA, 'name': 'Validated '+VERSION+' candidate ' + SHA[:12],
-            'draft': True, 'prerelease': True, 'body': 'Private draft preserving the original tested build while Actions artifact storage is full. Source: ' + SHA + '. CI run: ' + RUN + '. ISO: '+str(ISO_CHECKS)+' UEFI/live and packet checks. Not a published release.'}
+    notes = ('Alpha.11: dynamic dashboard, visual network ports and signed application update staging, installation, backup/rollback and interrupted-job recovery. '
+             'Original ISO passed 73 UEFI/live/install/cold-boot and actual installed update checks after Python, Chromium and packet suites. '
+             'See the attached Italian installation/bootstrap guide. Existing alpha.10 needs manual trusted DEB or new ISO bootstrap. '
+             'Production Ed25519 signing/trust is not provisioned by this release; DEB/checksums are not a signed web-update bundle. '
+             'Application updates only; no OS/kernel upgrade, HA, HTTPS antivirus inspection or guaranteed hard-power-cut recovery. '
+             'Experimental prerelease. No Fortinet code reused. ' if PUBLISH else
+             'Private draft preserving the original tested build while Actions artifact storage is full. Not a published release. ')
+    body = {'tag_name': tag, 'target_commitish': SHA, 'name': 'Murus Igneus '+VERSION if PUBLISH else 'Validated '+VERSION+' candidate '+SHA[:12],
+            'draft': True, 'prerelease': True, 'body': notes+'\n\nSource: '+SHA+'\nCI: https://github.com/'+REPO+'/actions/runs/'+RUN+'\nISO SHA256: `'+digest+'`'}
     release = request(API + '/releases', json.dumps(body).encode(), 'POST')
 assert release['draft'] and release['target_commitish'] == SHA
 for file in files:
@@ -68,6 +92,9 @@ for file in files:
         asset = old
     assert asset.get('digest') == expected and asset['size'] == len(data), asset
     print('Verified draft asset:', name, expected, flush=True)
-print('CANDIDATE_DRAFT=' + release['html_url'], flush=True)
+if PUBLISH:
+    release = request(API+'/releases/'+str(release['id']), json.dumps({'draft':False,'prerelease':True,'make_latest':'false'}).encode(), 'PATCH')
+    assert not release['draft'] and release['tag_name'] == tag
+print(('PUBLISHED_RELEASE=' if PUBLISH else 'CANDIDATE_DRAFT=') + release['html_url'], flush=True)
 with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
-    f.write('## Validated candidate preserved\n\nDraft release: ' + release['html_url'] + '\n\nOriginal ISO SHA256: `' + digest + '`\n\nNot published.\n')
+    f.write('## '+('Validated release published' if PUBLISH else 'Validated candidate preserved')+'\n\nRelease: '+release['html_url']+'\n\nOriginal ISO SHA256: `'+digest+'`\n')

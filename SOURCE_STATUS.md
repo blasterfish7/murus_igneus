@@ -1,3 +1,7 @@
+# Alpha.11 distribution
+
+Release preparation: versioned source includes the merged dynamic UI and signed application updater. Publication of v0.3.0-alpha.11 is gated on the complete CI suite and 73 checks against the original versioned ISO, including real installed-disk update/rollback/recovery. The release manifest records the exact commit, CI run and asset digests. See [alpha.11 bootstrap and limits](docs/ALPHA11.md). No production signing key is generated or installed; web updates require independently provisioned trust and signed bundles. Public alpha.10 assets remain unchanged.
+
 # Development after alpha.10 — not a new public release
 
 The dynamic dashboard/port cards and signed application update workflow are integrated through PRs #13/#14. [CI 40913064560](https://github.com/blasterfish7/murus_igneus/actions/runs/40913064560) passed 251 Python tests without skips, 24 Chromium checks, the existing 51 packet checks and 73 original-ISO checks. Six installed-disk checks exercise real HTTPS upload, Ed25519 validation, dpkg/OpenRC upgrade, package/configuration rollback, failing-postinst recovery and console recovery of an interrupted journal.

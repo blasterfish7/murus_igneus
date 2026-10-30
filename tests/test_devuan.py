@@ -18,6 +18,7 @@ from http.server import ThreadingHTTPServer
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'src/murus_igneus'))
 import server
+from migration import VERSION
 
 class ManagementTests(unittest.TestCase):
     def setUp(self):
@@ -53,7 +54,7 @@ class PackageTests(unittest.TestCase):
     def setUpClass(cls):
         cls.temp=tempfile.TemporaryDirectory()
         subprocess.run(['sh',str(ROOT/'packaging/devuan/build-deb.sh'),cls.temp.name],check=True,capture_output=True)
-        cls.package=Path(cls.temp.name)/'murus-igneus_0.3.0~alpha.10_all.deb'
+        cls.package=Path(cls.temp.name)/('murus-igneus_'+VERSION.replace('-','~',1)+'_all.deb')
         cls.data=tarfile.open(fileobj=io.BytesIO(subprocess.check_output(['dpkg-deb','--fsys-tarfile',str(cls.package)])))
         cls.control=tarfile.open(fileobj=io.BytesIO(subprocess.check_output(['dpkg-deb','--ctrl-tarfile',str(cls.package)])))
     @classmethod
