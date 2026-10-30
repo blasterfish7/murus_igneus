@@ -11,7 +11,7 @@ Dashboard and Interfaces now share a live visual presentation using the existing
 
 ## Version updates
 
-This change does not implement a firmware updater. Existing release DEBs can be installed manually on supported Devuan systems, but this is not a signed transactional appliance upgrade. The package stops the service during upgrade and does not automatically restart it. Update discovery, signed release metadata, configuration migration compatibility, recovery after power failure and automatic rollback to a previous OS/application version need a separate tested implementation. The published alpha.10 ISO is unchanged by this source change.
+The dashboard change alone does not implement a firmware updater. Subsequent source work adds a separate signed application update workflow; see [Updates](UPDATES.md) for provisioning, package/configuration recovery and limits. Devuan/kernel updates and OS A/B rollback remain separate. The published alpha.10 ISO is unchanged by these source changes.
 
 ## Verification
 

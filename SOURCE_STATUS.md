@@ -1,3 +1,9 @@
+# Development after alpha.10 — not a new public release
+
+The dynamic dashboard/port cards and signed application update workflow are integrated through PRs #13/#14. [CI 40913064560](https://github.com/blasterfish7/murus_igneus/actions/runs/40913064560) passed 251 Python tests without skips, 24 Chromium checks, the existing 51 packet checks and 73 original-ISO checks. Six installed-disk checks exercise real HTTPS upload, Ed25519 validation, dpkg/OpenRC upgrade, package/configuration rollback, failing-postinst recovery and console recovery of an interrupted journal.
+
+Tested application source: `a50beeb02b4162053b854a16fe76a0734e9dd37d`. The subsequent change at `92d338aad50820b755a1c7675052d4a80a450828` only wraps long update text in CSS and adds a mobile-preview assertion; the 24-check browser suite passed locally. No updater/backend code changed after the full ISO acceptance. The tested candidate remains a private draft, not a replacement for the published alpha.10. See [update setup/limits](docs/UPDATES.md), [acceptance](docs/WEB-UPDATES-QA.md) and [structured evidence](docs/qa/web-updates-validation.json).
+
 # Published release — 0.3.0-alpha.10
 
 PR #12 is merged. [Download alpha.10](https://github.com/blasterfish7/murus_igneus/releases/tag/v0.3.0-alpha.10): original tested ISO, DEB, guide, checksums and acceptance/provenance manifests. Earlier releases and drafts remain unchanged.

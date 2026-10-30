@@ -246,6 +246,16 @@ print('ISO_ROOT_PARENTAL_APPLY_ROLLBACK_OK')
         else:raise AssertionError('Installed disk HTTPS unavailable')
         assert json.loads(web('api/installer'))['live'] is False
         checks.append('Installed disk boots independently with the ISO detached and serves management HTTPS through the NIC');print('PASS '+checks[-1],flush=True)
+        command(': > /tmp/murus-updates-runtime.b64')
+        updates_payload = base64.b64encode(gzip.compress((ROOT/'tools/validate-updates-runtime.py').read_bytes())).decode()
+        for pos in range(0,len(updates_payload),1000):
+            command("printf '%s' '"+updates_payload[pos:pos+1000]+"' >> /tmp/murus-updates-runtime.b64")
+        command("python3 -c \"import base64,gzip;from pathlib import Path;Path('/tmp/validate-updates-runtime.py').write_bytes(gzip.decompress(base64.b64decode(Path('/tmp/murus-updates-runtime.b64').read_bytes())))\"")
+        output = command('MURUS_LAB=YES MURUS_UPDATE_DISPOSABLE_VM=YES MURUS_QA_PASSWORD='+QA_PASSWORD+' python3 /tmp/validate-updates-runtime.py', timeout=900)
+        update_report = json.loads(re.search(r'MIQA_UPDATES=(\{[^\r\n]+\})',output).group(1))
+        assert update_report['success'] and len(update_report['checks'])==6,update_report
+        for item in update_report['checks']:
+            checks.append('Installed update: '+item);print('PASS '+checks[-1],flush=True)
         child.sendline('poweroff');child.expect(pexpect.EOF,timeout=300)
         checks.append('Graceful installed VM poweroff');print('PASS '+checks[-1],flush=True)
         with iso.open('rb') as file:

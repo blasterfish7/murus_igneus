@@ -53,6 +53,46 @@
       <h3>Vicini LLDP</h3><p>Indice LLDP: timeMark.portaLocale.indiceRemoto. Il numero locale LLDP può differire dall’indice IF-MIB.</p><pre id="sw-lldp"></pre>
     </section>
   `);
+  page('updates-page', `
+    <p class="eyebrow">MANUTENZIONE DEL SISTEMA</p><h2>Aggiornamenti</h2>
+    <p>Aggiorna l’applicazione Murus Igneus con un bundle firmato. Il servizio e il traffico vengono interrotti durante il riavvio.</p>
+    <div class="runtime-grid"><article class="runtime-card"><span>Versione installata</span><strong id="update-version">—</strong><small>Pacchetto applicativo DEB</small></article><article class="runtime-card"><span>Firma degli aggiornamenti</span><strong id="update-trust">—</strong><small>Chiave Ed25519 configurata dalla console</small></article><article class="runtime-card"><span>Ripristino disponibile</span><strong id="update-previous">—</strong><small>Pacchetto e configurazione salvata</small></article></div>
+    <p id="update-availability" role="status"></p>
+    <section class="panel"><h3>Release disponibili</h3><label>Canale<select id="update-channel"><option value="stable">Stabile</option><option value="experimental">Sperimentale · include alpha e beta</option></select></label><button id="update-check" class="secondary">Controlla release su GitHub</button><p id="update-catalog-state" role="status"></p><div id="update-releases"></div><p>Il catalogo non autorizza l’installazione: il bundle deve sempre superare la verifica della firma. I repository privati possono richiedere il caricamento offline.</p></section>
+    <section class="panel"><h3>Carica un aggiornamento firmato</h3><p>Seleziona i tre file del bundle. Il solo DEB o il checksum della ISO non costituiscono un aggiornamento firmato.</p><form id="update-upload"><label>Manifest JSON<input id="update-manifest" type="file" accept=".json" required></label><label>Firma Ed25519<input id="update-signature" type="file" accept=".sig" required></label><label>Pacchetto applicativo (massimo 4 MiB)<input id="update-package" type="file" accept=".deb" required></label><button id="update-verify">Verifica bundle</button></form><p id="update-preview" role="status"></p><div id="update-install-panel" hidden><label>Per installare, riscrivi <strong id="update-install-phrase"></strong><input id="update-install-text" autocomplete="off"></label><button id="update-install" disabled>Backup e installazione</button></div></section>
+    <section class="panel"><h3>Operazione e recupero</h3><p id="update-job-state" role="status">Nessuna operazione</p><details><summary>Dettagli tecnici dell’operazione</summary><pre id="update-job-detail" hidden></pre></details><p>Il backup comprende il pacchetto e la configurazione applicativa. Il recupero del registro interrotto va completato prima di nuove modifiche.</p><label id="update-restore-label">Per ripristinare, riscrivi <strong id="update-restore-phrase"></strong><input id="update-restore-text" autocomplete="off"></label><button id="update-restore" disabled>Ripristina versione precedente</button></section>
+    <aside>Questo aggiornamento non comprende Devuan, kernel o firmware. Le firme antivirus e IPS si aggiornano dalla pagina UTM. Un guasto del disco o del sistema operativo richiede il recupero da console/ISO.</aside>
+  `);
+  let updatePreview=null, updateMonitoring=false, updateRead=null, updateInventory=null;
+  function resetUpdatePreview(){updatePreview=null;el('update-install-panel').hidden=true;el('update-install').disabled=true;el('update-preview').textContent='';}
+  for(const id of ['update-manifest','update-signature','update-package'])el(id).onchange=resetUpdatePreview;
+  async function refreshUpdates(){
+    if(updateRead)return updateRead;
+    updateRead=(async()=>{try{
+      const data=await api('updates');updateInventory=data;
+      el('update-version').textContent=data.installed_version||'Non installato';
+      el('update-trust').textContent=data.trust_configured?'Chiave presente':'Da configurare';
+      el('update-previous').textContent=data.rollback_version||'Nessuno';
+      el('update-availability').textContent=data.live?'Sessione live: installa prima Murus su disco.':!data.supported?'Aggiornamenti disponibili solo su Devuan 6 Excalibur installato.':!data.trust_configured?'Configura dalla console la chiave pubblica di firma attendibile in /etc/murus_igneus/update.pub. Non caricare la chiave privata sul firewall.':data.scope;
+      const job=data.job, recovery=job?.state==='recovery_required', locked=data.busy||recovery;
+      el('update-verify').disabled=!data.supported||!data.trust_configured||locked;
+      const stateNames={queued:'In attesa',running:'In corso',recovering:'Ripristino in corso',recovery_required:'Recupero necessario',succeeded:'Completato',failed:'Non riuscito'};
+      el('update-job-state').textContent=job?((stateNames[job.state]||'Stato da verificare')+' · '+job.phase+(job.error?' · '+job.error:'')):'Nessuna operazione di aggiornamento';
+      el('update-job-detail').hidden=!job;el('update-job-detail').textContent=job?JSON.stringify(job,null,2):'';
+      el('update-restore-phrase').textContent=recovery?'RECUPERA SERVIZIO':data.rollback_version?'RIPRISTINA '+data.rollback_version:'';
+      el('update-restore-label').hidden=!recovery&&!data.rollback_available;
+      el('update-restore').textContent=recovery?'Recupera operazione interrotta':'Ripristina versione precedente';
+      el('update-restore').disabled=!data.supported||data.busy||(!recovery&&!data.rollback_available)||el('update-restore-text').value!==el('update-restore-phrase').textContent;
+    }catch(exc){el('update-job-state').textContent='Servizio non raggiungibile · attendo il ritorno della pagina web. '+exc.message;el('update-verify').disabled=el('update-install').disabled=el('update-restore').disabled=true;}finally{updateRead=null;}})();return updateRead;
+  }
+  el('nav').append(button('Aggiornamenti',async()=>{show('updates-page');updateMonitoring=true;await refreshUpdates();}));
+  el('update-check').onclick=async()=>{el('update-check').disabled=true;el('update-catalog-state').textContent='Controllo release…';el('update-releases').replaceChildren();try{const data=await api('updates/check',{channel:el('update-channel').value});el('update-catalog-state').textContent=data.releases.length?'Release pubblicate per il canale selezionato.':'Nessuna release pubblicata per questo canale.';for(const release of data.releases){const article=text('article','','panel'),link=text('a','Apri release su GitHub');link.href=release.url;link.target='_blank';link.rel='noopener noreferrer';article.append(text('h4',release.tag+(release.newer?' · più recente':'')),text('p',release.notes||'Nessuna nota disponibile'),link);el('update-releases').append(article);}}catch(exc){el('update-catalog-state').textContent=exc.message;}finally{el('update-check').disabled=false;}};
+  async function encodedFile(id,limit){const file=el(id).files[0];if(!file||file.size===0||file.size>limit)throw Error('File mancante o oltre il limite: '+id);const bytes=new Uint8Array(await file.arrayBuffer());let value='';for(let i=0;i<bytes.length;i+=32768)value+=String.fromCharCode(...bytes.subarray(i,i+32768));return btoa(value);}
+  el('update-upload').onsubmit=async event=>{event.preventDefault();resetUpdatePreview();el('update-verify').disabled=true;try{const files={'manifest.json':await encodedFile('update-manifest',4096),'manifest.sig':await encodedFile('update-signature',64),'murus-igneus.deb':await encodedFile('update-package',4*1024*1024)};const result=await api('updates/stage',{files});updatePreview=result;el('update-preview').textContent='Firma, digest e metadati verificati · versione '+result.version+' · SHA256 '+result.sha256;el('update-install-phrase').textContent=result.confirmation;el('update-install-text').value='';el('update-install-panel').hidden=false;}catch(exc){el('update-preview').textContent=exc.message;}finally{await refreshUpdates();}};
+  el('update-install-text').oninput=()=>{el('update-install').disabled=!updatePreview||el('update-install-text').value!==updatePreview.confirmation;};
+  el('update-install').onclick=async()=>{if(!updatePreview)return;if(dirty&&!confirm('La bozza non salvata non verrà installata né inclusa nel backup. Continuare con la configurazione confermata?'))return;el('update-install').disabled=true;try{await api('updates/install',{id:updatePreview.id,confirmation:el('update-install-text').value});resetUpdatePreview();el('update-job-state').textContent='Aggiornamento avviato. La pagina può perdere temporaneamente la connessione.';await refreshUpdates();}catch(exc){el('update-preview').textContent=exc.message;}};
+  el('update-restore-text').oninput=()=>{el('update-restore').disabled=!updateInventory||updateInventory.busy||el('update-restore-text').value!==el('update-restore-phrase').textContent;};
+  el('update-restore').onclick=async()=>{if(!confirm('Il servizio verrà riavviato. Il ripristino del pacchetto recupera anche la configurazione del suo backup. Continuare?'))return;el('update-restore').disabled=true;try{const recovering=updateInventory?.job?.state==='recovery_required';await api(recovering?'updates/recover':'updates/rollback',{confirmation:el('update-restore-text').value});el('update-restore-text').value='';await refreshUpdates();}catch(exc){el('update-job-state').textContent=exc.message;}};
   const dialog = document.createElement('dialog');
   dialog.id = 'sw-confirm-dialog';
   dialog.innerHTML = `<form id="sw-confirm-form"><h3>Conferma modifica porta</h3><p id="sw-warning"></p><p>Scrivi esattamente: <strong id="sw-phrase"></strong></p><label>Conferma<input id="sw-confirm-text" autocomplete="off"></label><div class="actions"><button id="sw-execute" disabled>Esegui sullo switch</button><button type="button" id="sw-dismiss" class="secondary">Annulla</button></div></form>`;
@@ -180,6 +220,7 @@
     try { await startSwitch('switches/port/apply', { token: portPlan.token, confirmation: el('sw-confirm-text').value }, 'apply'); dialog.close(); portPlan = null; } catch (exc) { error(exc); }
   };
   async function progress() {
+    if(updateMonitoring&&!document.hidden&&!el('updates-page').hidden)await refreshUpdates();
     if (aiJob) {
       const data = await api('assistant'), task = data.task;
       if (task?.id !== aiJob) {

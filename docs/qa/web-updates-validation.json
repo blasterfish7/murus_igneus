@@ -1,0 +1,42 @@
+{
+  "reviewed_on": "2026-10-30",
+  "tested_source": "a50beeb02b4162053b854a16fe76a0734e9dd37d",
+  "ui_source": "92d338aad50820b755a1c7675052d4a80a450828",
+  "ci_run": 40913064560,
+  "ci_url": "https://github.com/blasterfish7/murus_igneus/actions/runs/40913064560",
+  "python_tests": 251,
+  "python_skips": 0,
+  "browser_checks": 24,
+  "iso_checks": 73,
+  "packet_checks": {
+    "native": 13,
+    "enterprise": 9,
+    "parental": 23,
+    "dhcp_wan": 6
+  },
+  "installed_update_checks": 6,
+  "candidate_release_id": 428144307,
+  "candidate_is_draft": true,
+  "candidate_iso": {
+    "size": 475064320,
+    "sha256": "1521b80245ef481af682f0c314d764ccbdf9449f79255c0c81027c59c0fa6b67"
+  },
+  "candidate_deb": {
+    "size": 131116,
+    "sha256": "91062cc349ad43fc9db897dd2edcebf5e488714e7cf191917658cfd69aced7c9"
+  },
+  "post_ci_changes": [
+    "CSS digest/release-note wrapping",
+    "mobile preview browser assertion"
+  ],
+  "post_ci_browser_report_checks": 24,
+  "post_ci_stylesheet_sha256": "90913d5caec838a9576cc2549ddfce4eaf0345fcd68c19e252f64996513d6e9c",
+  "published_release_changed": false,
+  "production_signing_key_generated": false,
+  "limits": [
+    "Application updates only, not OS/kernel/bootloader",
+    "Trusted public key and matching signed bundle must be provisioned",
+    "Private catalog can require offline bundle upload",
+    "No hard-power-cut or physical hardware certification"
+  ]
+}
