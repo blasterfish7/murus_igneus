@@ -1,6 +1,12 @@
-# Alpha.11 distribution
+# Published release — 0.3.0-alpha.11
 
-Release preparation: versioned source includes the merged dynamic UI and signed application updater. Publication of v0.3.0-alpha.11 is gated on the complete CI suite and 73 checks against the original versioned ISO, including real installed-disk update/rollback/recovery. The release manifest records the exact commit, CI run and asset digests. See [alpha.11 bootstrap and limits](docs/ALPHA11.md). No production signing key is generated or installed; web updates require independently provisioned trust and signed bundles. Public alpha.10 assets remain unchanged.
+[Download alpha.11](https://github.com/blasterfish7/murus_igneus/releases/tag/v0.3.0-alpha.11), published 30 October 2026: original tested ISO, DEB, Italian bootstrap guide, update guide, SHA256 checksums, ISO acceptance and provenance manifests (10 assets). Source `4893a68b3d31c976375e86d434694138cc7a1ce0`; [CI 41051922455](https://github.com/blasterfish7/murus_igneus/actions/runs/41051922455) succeeded with 251 Python tests without skips, 24 Chromium checks, 51 packet checks and 73 original ISO checks, including six actual installed-disk update/recovery checks. Asset digests were independently read back from the release API and matched the publisher log; all assets are uploaded and the release is not a draft. [Structured release evidence](docs/qa/alpha11-release-validation.json).
+
+ISO SHA256: `3b50b67de90fc927fca64261cbd1e0f556934072c7ee505921e3b5ed428979f8` (475064320 bytes). DEB SHA256: `5e2867fa76687547a4bd9c5bbfa13d846d369399db1e1e66197b4a0854a5df90` (131124 bytes). The new ISO includes the final mobile digest-wrapping fix and all merged UI/updater work. Public alpha.10 ISO/DEB remain unchanged.
+
+Production signing trust is not provisioned automatically, and the DEB/checksum assets are not a signed web-update bundle. Existing alpha.10 installations require initial trusted manual DEB/ISO bootstrap. See [alpha.11 instructions and limits](docs/ALPHA11.md) and [application updates](docs/UPDATES.md). Application updates do not update Devuan/kernel; no physical hardware, BIOS/Secure Boot or hard-power-cut recovery certification.
+
+## Historical pre-release acceptance
 
 # Development after alpha.10 — not a new public release
 

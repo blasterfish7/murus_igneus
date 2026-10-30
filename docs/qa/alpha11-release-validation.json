@@ -1,0 +1,90 @@
+{
+  "version": "0.3.0-alpha.11",
+  "published_at": "2026-10-30T12:14:38Z",
+  "release_id": 428993947,
+  "release_url": "https://github.com/blasterfish7/murus_igneus/releases/tag/v0.3.0-alpha.11",
+  "source_sha": "4893a68b3d31c976375e86d434694138cc7a1ce0",
+  "ci": {
+    "run_id": 41051922455,
+    "url": "https://github.com/blasterfish7/murus_igneus/actions/runs/41051922455",
+    "conclusion": "success",
+    "python_tests": 251,
+    "python_skips": 0,
+    "chromium_checks": 24,
+    "packet_checks": 51,
+    "iso_checks": 73,
+    "installed_update_checks": 6
+  },
+  "assets": [
+    {
+      "name": "alpha11-iso-networking-qa.json",
+      "size": 7537,
+      "sha256": "4e4c61678730a2d8acf794d7d9f2a95c871135d419bf13e494895c30706fb00c",
+      "url": "https://github.com/blasterfish7/murus_igneus/releases/download/v0.3.0-alpha.11/alpha11-iso-networking-qa.json"
+    },
+    {
+      "name": "bootstrap-provenance.json",
+      "size": 833,
+      "sha256": "d813f37aa13ac7868df1cc2941dc05b03545d2bf8e146029ee9b324705cc5374",
+      "url": "https://github.com/blasterfish7/murus_igneus/releases/download/v0.3.0-alpha.11/bootstrap-provenance.json"
+    },
+    {
+      "name": "candidate-validation.json",
+      "size": 1434,
+      "sha256": "13ba3ed96ae955f7c67d6dfaa8c236211a86219142549b6d6b321db88ded921c",
+      "url": "https://github.com/blasterfish7/murus_igneus/releases/download/v0.3.0-alpha.11/candidate-validation.json"
+    },
+    {
+      "name": "murus-igneus-0.3.0-alpha.11-devuan-amd64.iso",
+      "size": 475064320,
+      "sha256": "3b50b67de90fc927fca64261cbd1e0f556934072c7ee505921e3b5ed428979f8",
+      "url": "https://github.com/blasterfish7/murus_igneus/releases/download/v0.3.0-alpha.11/murus-igneus-0.3.0-alpha.11-devuan-amd64.iso"
+    },
+    {
+      "name": "MURUS-IGNEUS-ALPHA11-LEGGIMI.md",
+      "size": 3173,
+      "sha256": "335b7d47fe0d231be264ce7189478ca775d73b255b1e0fa5bca023f139996019",
+      "url": "https://github.com/blasterfish7/murus_igneus/releases/download/v0.3.0-alpha.11/MURUS-IGNEUS-ALPHA11-LEGGIMI.md"
+    },
+    {
+      "name": "murus-igneus_0.3.0-alpha.11_all.deb",
+      "size": 131124,
+      "sha256": "5e2867fa76687547a4bd9c5bbfa13d846d369399db1e1e66197b4a0854a5df90",
+      "url": "https://github.com/blasterfish7/murus_igneus/releases/download/v0.3.0-alpha.11/murus-igneus_0.3.0-alpha.11_all.deb"
+    },
+    {
+      "name": "packages-devuan.tsv",
+      "size": 9650,
+      "sha256": "a5106bed9ac833d7fa54a70c8a7102f46cbc049121b17c802fc2777f79390fe1",
+      "url": "https://github.com/blasterfish7/murus_igneus/releases/download/v0.3.0-alpha.11/packages-devuan.tsv"
+    },
+    {
+      "name": "SHA256SUMS",
+      "size": 750,
+      "sha256": "c81d89d631dd4be5cfb254efdec8e4dbb53672f56b65acc14f50cea526caacd5",
+      "url": "https://github.com/blasterfish7/murus_igneus/releases/download/v0.3.0-alpha.11/SHA256SUMS"
+    },
+    {
+      "name": "signature-status.txt",
+      "size": 57,
+      "sha256": "5db8636adba8ad2b58951db44644e4c07fa0705570adecdba0f2af969790e484",
+      "url": "https://github.com/blasterfish7/murus_igneus/releases/download/v0.3.0-alpha.11/signature-status.txt"
+    },
+    {
+      "name": "UPDATES.md",
+      "size": 6469,
+      "sha256": "5ee76606877ddee703b887e45f58c443f63756eae18bfb70bd281766558d1357",
+      "url": "https://github.com/blasterfish7/murus_igneus/releases/download/v0.3.0-alpha.11/UPDATES.md"
+    }
+  ],
+  "alpha10_unchanged": true,
+  "production_signing_key_provisioned": false,
+  "signed_update_bundle_published": false,
+  "limits": [
+    "Application updates only; no OS/kernel/bootloader upgrade",
+    "Initial alpha.10 migration requires manual trusted DEB/ISO bootstrap",
+    "Trusted Ed25519 public key and signed bundle required before future web upgrades",
+    "No hard power cut or physical hardware/BIOS/Secure Boot validation",
+    "Experimental UTM; no antivirus inspection of HTTPS content"
+  ]
+}
