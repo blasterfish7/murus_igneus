@@ -5,7 +5,6 @@ import sys
 import unittest
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src/murus_igneus'))
-import admin_ssh
 from configuration import compile_config, empty
 
 
