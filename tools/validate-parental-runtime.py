@@ -229,6 +229,19 @@ for line in sys.stdin:
             assert query('allowed.test')['answers']>0 and query('www.google.com')['ip']=='216.239.38.120'
         ok('Entering study mode switches real DNS to the school allowlist; leaving restores normal filtering and SafeSearch')
         with parental.LOCK:
+            active['social_services']=['whatsapp']
+            active['social_windows']=[{'days':[0,1,2,3,4],'start':'15:00','end':'19:00'}]
+            for hour, minute, blocked in [(13,59,False),(14,0,True),(17,59,True),(18,0,False)]:
+                parental.tick(datetime(2026,10,26,hour,minute,tzinfo=timezone.utc))
+                assert (query('web.whatsapp.com')['answers']==0)==blocked
+                assert query('adult.test')['answers']==0 and query('instagram.com')['answers']==0
+                assert query('allowed.test')['answers']>0 and http()['status']==200
+            parental.tick(datetime(2026,10,31,15,0,tzinfo=timezone.utc))
+            assert query('web.whatsapp.com')['answers']>0 and query('adult.test')['answers']==0
+            active['social_windows']=[];parental.tick()
+        ok('Weekday social DNS restrictions turn on/off at Rome-time boundaries without dropping adult filtering or Internet access')
+
+        with parental.LOCK:
             expected=parental.CURRENT
             payload={'category':'adult','domains':['newadult.test'],'updated':time.time(),'sha256':'controlled-refresh','source':'controlled-fixture'}
             with patch.object(parental,'download_feed',return_value=payload):parental.refresh_active_lists(expected)
@@ -273,5 +286,5 @@ for line in sys.stdin:
         parental.stop();security.activate(security.defaults());server.networking.stop()
         for process in processes:process.terminate();process.wait(timeout=5)
         for name in ['pc-kid','pc-up']:run(['ip','netns','del',name],check=False)
-        (ROOT/'dist').mkdir(exist_ok=True);(ROOT/'dist/parental-runtime-qa.json').write_text(json.dumps({'success':len(checks)==23,'checks':checks,'scope':'Real dnsmasq/nftables/DHCP/TCP and the actual HTTP proxy with a controlled clean-scanner fixture; no mobile network, real encrypted app efficacy or commercial category certification.'},indent=2))
-assert len(checks)==23,checks
+        (ROOT/'dist').mkdir(exist_ok=True);(ROOT/'dist/parental-runtime-qa.json').write_text(json.dumps({'success':len(checks)==24,'checks':checks,'scope':'Real dnsmasq/nftables/DHCP/TCP and the actual HTTP proxy with a controlled clean-scanner fixture; no mobile network, real encrypted app efficacy or commercial category certification.'},indent=2))
+assert len(checks)==24,checks

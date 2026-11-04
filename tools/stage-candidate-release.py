@@ -1,4 +1,4 @@
-"""Preserve validated candidates; explicitly gated alpha.11 distribution after CI."""
+"""Preserve validated candidates; explicitly gated alpha.12 distribution after CI."""
 import hashlib
 import json
 import os
@@ -18,11 +18,11 @@ sys.path.insert(0,str(ROOT/'src/murus_igneus'))
 from migration import VERSION
 assert re.fullmatch(r'0\.3\.0-alpha\.[0-9]+',VERSION)
 LABEL=VERSION.removeprefix('0.3.0-').replace('.','')
-ISO_CHECKS=73
+ISO_CHECKS=78
 API = 'https://api.github.com/repos/' + REPO
 PUBLISH = os.environ.get('MURUS_PUBLISH_RELEASE')
 if PUBLISH:
-    assert PUBLISH == VERSION == '0.3.0-alpha.11'
+    assert PUBLISH == VERSION == '0.3.0-alpha.12'
     assert os.environ['GITHUB_REF'] == 'refs/heads/main'
 
 
@@ -47,8 +47,8 @@ assert (out / 'SHA256SUMS').read_text().strip() == digest + '  ' + iso.name
 files = [iso, out / ('murus-igneus_'+VERSION.replace('-','~',1)+'_all.deb'), out / (LABEL+'-iso-networking-qa.json'),
          out / 'SHA256SUMS', out / 'packages-devuan.tsv', out / 'signature-status.txt', out / 'bootstrap-provenance.json']
 if PUBLISH:
-    guide = out / 'MURUS-IGNEUS-ALPHA11-LEGGIMI.md'
-    guide.write_bytes((ROOT / 'docs/ALPHA11.md').read_bytes())
+    guide = out / 'MURUS-IGNEUS-ALPHA12-LEGGIMI.md'
+    guide.write_bytes((ROOT / 'docs/ALPHA12.md').read_bytes())
     update_guide = out / 'UPDATES.md'
     update_guide.write_bytes((ROOT / 'docs/UPDATES.md').read_bytes())
     files.extend([guide, update_guide])
@@ -69,9 +69,9 @@ tag = 'v'+VERSION if PUBLISH else 'candidate-'+LABEL+'-' + SHA[:12] + '-' + RUN
 existing = request(API + '/releases?per_page=100')
 release = next((r for r in existing if r['tag_name'] == tag), None)
 if release is None:
-    notes = ('Alpha.11: dynamic dashboard, visual network ports and signed application update staging, installation, backup/rollback and interrupted-job recovery. '
-             'Original ISO passed 73 UEFI/live/install/cold-boot and actual installed update checks after Python, Chromium and packet suites. '
-             'See the attached Italian installation/bootstrap guide. Existing alpha.10 needs manual trusted DEB or new ISO bootstrap. '
+    notes = ('Alpha.12: optional Ed25519 SSH on the IPv4 management interface and scheduled parental social filters independent of permanent categories. '
+             'Original ISO passed 78 UEFI/live/install/cold-boot and actual installed update checks after Python, Chromium and packet suites. '
+             'See the attached Italian installation/bootstrap guide. Use the DEB from the console to upgrade an existing installation; see the guide for the optional OpenSSH dependency. '
              'Production Ed25519 signing/trust is not provisioned by this release; DEB/checksums are not a signed web-update bundle. '
              'Application updates only; no OS/kernel upgrade, HA, HTTPS antivirus inspection or guaranteed hard-power-cut recovery. '
              'Experimental prerelease. No Fortinet code reused. ' if PUBLISH else

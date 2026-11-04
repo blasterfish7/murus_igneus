@@ -221,6 +221,15 @@ let browser, firstFixture;
   await page.locator('#events-refresh').click();
   await page.waitForFunction(() => document.getElementById('events-history').textContent.includes('/api/assistant/settings'));
   checks.push('New enterprise form renders and persisted administrative event is visible');
+  await page.locator('#ssh-enabled').check();
+  await page.locator('#ssh-sources').fill('198.18.0.10');
+  const keyBlob=Buffer.concat([Buffer.from('0000000b','hex'),Buffer.from('ssh-ed25519'),Buffer.from('00000020','hex'),Buffer.alloc(32,7)]);
+  await page.locator('#ssh-keys').fill('ssh-ed25519 '+keyBlob.toString('base64')+' workstation');
+  await page.getByRole('button',{name:'Salva SSH nella bozza',exact:true}).click();
+  await page.locator('#validate').click();await page.waitForFunction(()=>validated===true);
+  assert.match(await page.locator('#rules').textContent(),/198\.18\.0\.10\/32.*Murus SSH management/);
+  checks.push('SSH management GUI submits an allowlisted key-only draft to the real compiler without starting SSH');
+
   await nav('Parental control');
   await page.locator('#parental-enabled').check(); await page.locator('#parental-reporting').check(); await page.locator('#parental-add').click();
   const profile = page.locator('#parental-profiles article');
@@ -239,6 +248,8 @@ let browser, firstFixture;
   await profile.getByRole('button',{name:'Imposta notte 21:00–07:00 tutti i giorni',exact:true}).click();
   await profile.getByLabel('Domini scolastici consentiti durante i compiti',{exact:true}).fill('school.test');
   await profile.getByRole('button',{name:'Imposta compiti 16:00–18:00 lunedì–venerdì',exact:true}).click();
+  await profile.getByRole('button',{name:'Blocca WhatsApp e Instagram · lun–ven 15:00–19:00',exact:true}).click();
+  await profile.getByLabel('Contenuti per adulti',{exact:true}).check();
   await page.locator('#parental-form').getByRole('button',{name:'Salva parental control nella bozza'}).click();
   await page.locator('#validate').click(); await page.waitForFunction(()=>validated===true);
   assert.match(await page.locator('#rules').textContent(),/hook forward priority -20/);
@@ -250,6 +261,11 @@ let browser, firstFixture;
   assert.equal(await page.evaluate(()=>config.parental.profiles[0].youtube_restricted),'moderate');
   assert.equal(await page.evaluate(()=>config.parental.profiles[0].night_windows[0].start),'21:00');
   assert.equal(await page.evaluate(()=>config.parental.profiles[0].study_domains[0]),'school.test');
+  assert.deepEqual(await page.evaluate(()=>config.parental.profiles[0].social_windows),[{days:[0,1,2,3,4],start:'15:00',end:'19:00'}]);
+  assert.deepEqual(await page.evaluate(()=>config.parental.profiles[0].social_services),['whatsapp','instagram']);
+  assert.deepEqual(await page.evaluate(()=>config.parental.profiles[0].categories),['adult']);
+  assert.equal(await page.evaluate(()=>config.parental.profiles[0].services.includes('instagram')),false);
+
   assert.match(await page.locator('#rules').textContent(),/meta nfproto ipv6 counter drop/);
   checks.push('Family GUI persists named devices, Google and YouTube restrictions, study/night presets, IPv6 LAN guard and opt-in feed updates through the real compiler');
 

@@ -32,6 +32,7 @@ SERVICES = {
     'facebook': ['facebook.com', 'facebook.net', 'fb.com', 'fbcdn.net', 'messenger.com'],
     'youtube': ['youtube.com', 'youtu.be', 'googlevideo.com', 'ytimg.com', 'youtubei.googleapis.com'],
     'snapchat': ['snapchat.com', 'snap.com', 'sc-cdn.net'],
+    'whatsapp': ['whatsapp.com', 'whatsapp.net', 'wa.me'],
     'discord': ['discord.com', 'discord.gg', 'discordapp.com', 'discordapp.net'],
     'twitch': ['twitch.tv', 'ttvnw.net', 'jtvnw.net'],
 }
@@ -130,10 +131,10 @@ def validate(config, management='eth0'):
     for row in profiles:
         if not isinstance(row, dict):
             raise Error('Profilo parental non valido')
-        for key, value in {'devices': [], 'safe_search': False, 'youtube_restricted': 'off', 'study_windows': [], 'study_domains': [], 'night_windows': [], 'block_ipv6': False}.items():
+        for key, value in {'devices': [], 'safe_search': False, 'youtube_restricted': 'off', 'social_windows': [], 'social_services': [], 'study_windows': [], 'study_domains': [], 'night_windows': [], 'block_ipv6': False}.items():
             row.setdefault(key, value)
-        fields(row, 'id name enabled interface clients categories services blocked_domains allowed_domains windows paused enforce_dns block_quic devices safe_search youtube_restricted study_windows study_domains night_windows block_ipv6')
-        required = set('id name enabled interface clients categories services blocked_domains allowed_domains windows paused enforce_dns block_quic devices safe_search youtube_restricted study_windows study_domains night_windows block_ipv6'.split())
+        fields(row, 'id name enabled interface clients categories services blocked_domains allowed_domains windows paused enforce_dns block_quic devices safe_search youtube_restricted study_windows study_domains night_windows block_ipv6 social_windows social_services')
+        required = set('id name enabled interface clients categories services blocked_domains allowed_domains windows paused enforce_dns block_quic devices safe_search youtube_restricted study_windows study_domains night_windows block_ipv6 social_windows social_services'.split())
         if set(row) != required or type(row['id']) is not int or not 1 <= row['id'] <= 8 or row['id'] in ids:
             raise Error('Profilo incompleto o ID non univoco (1–8)')
         ids.add(row['id'])
@@ -156,12 +157,14 @@ def validate(config, management='eth0'):
                     raise Error('Dispositivi/subnet sovrapposti tra profili abilitati')
                 used.append(n)
         row['clients'] = list(dict.fromkeys(str(n) for n in clients))
-        for key, known in [('categories', FEEDS), ('services', SERVICES)]:
+        for key, known in [('categories', FEEDS), ('services', SERVICES), ('social_services', SERVICES)]:
             if not isinstance(row[key], list) or not all(isinstance(v, str) and v in known for v in row[key]) or len(set(row[key])) != len(row[key]):
                 raise Error('Categoria o servizio parental non valido')
         row['blocked_domains'] = names(row['blocked_domains']); row['allowed_domains'] = names(row['allowed_domains'])
-        for key in ('windows', 'study_windows', 'night_windows'):
+        for key in ('windows', 'study_windows', 'night_windows', 'social_windows'):
             validate_windows(row[key])
+        if row['social_windows'] and (not row['social_services'] or not row['enforce_dns']):
+            raise Error('Le fasce social richiedono almeno un servizio e DNS forzato')
         if row['youtube_restricted'] not in ('off', 'strict', 'moderate'):
             raise Error('Modalità YouTube non valida')
         row['study_domains'] = names(row['study_domains'])
@@ -326,11 +329,11 @@ def matches(host, values):
     return any('.'.join(labels[i:]) in values for i in range(len(labels)))
 
 
-def dns_config(profile, settings, interface, feeds, management, study=False):
+def dns_config(profile, settings, interface, feeds, management, study=False, social=False):
     blocked = set(profile['blocked_domains'])
     for category in profile['categories']:
         blocked.update(feeds[category])
-    for service in profile['services']:
+    for service in set(profile['services']) | (set(profile.get('social_services', [])) if social else set()):
         blocked.update(SERVICES[service])
     if profile['enforce_dns']:
         blocked.update(ENCRYPTED_DNS)
@@ -391,6 +394,10 @@ def safe_dns(profile, blocked, study):
 def in_mode(profile, key, timezone, now=None):
     windows = profile.get(key, [])
     return bool(windows) and in_window({'windows': windows}, timezone, now)
+
+
+def dns_mode(profile, timezone, now=None):
+    return (in_mode(profile, 'study_windows', timezone, now), in_mode(profile, 'social_windows', timezone, now))
 
 
 def in_window(profile, timezone, now=None):
@@ -471,7 +478,7 @@ def schedule_rules(settings, interfaces, overrides, now=None, ready=None, grants
         reason = 'resolver fermo' if failed else 'pausa' if p['paused'] or temporary > stamp else 'notte' if night and grant <= stamp else 'fuori orario' if grant <= stamp and not in_window(p, settings['timezone'], now) else ''
         rows.append({'id': p['id'], 'name': p['name'], 'blocked': bool(reason), 'reason': reason,
                      'pause_until': temporary if temporary > stamp else None, 'resolver_running': not failed, 'bonus_until': grant if grant > stamp else None,
-                     'study': study, 'devices': copy.deepcopy(p.get('devices', [])), 'ipv6_blocked_lan': p['interface'] in ipv6_lans})
+                     'study': study, 'social': in_mode(p, 'social_windows', settings['timezone'], now), 'devices': copy.deepcopy(p.get('devices', [])), 'ipv6_blocked_lan': p['interface'] in ipv6_lans})
         if reason:
             lines += drop_rules(p, settings, interfaces)
     return '\n'.join(lines) + '\n', rows
@@ -484,7 +491,7 @@ def tick(now=None):
             return
         settings = CURRENT['settings']; interfaces = CURRENT['interfaces']
         synchronize_dns(now)
-        ready = {p['id']: bool(security.PROCESSES.get('parental-' + str(p['id'])) and security.PROCESSES['parental-' + str(p['id'])].poll() is None and DNS_MODES.get(p['id']) == in_mode(p, 'study_windows', settings['timezone'], now)) for p in active_profiles(settings)}
+        ready = {p['id']: bool(security.PROCESSES.get('parental-' + str(p['id'])) and security.PROCESSES['parental-' + str(p['id'])].poll() is None and DNS_MODES.get(p['id']) == dns_mode(p, settings['timezone'], now)) for p in active_profiles(settings)}
         script, rows = schedule_rules(settings, interfaces, pauses(STATE), now, ready, bonuses(STATE))
         if script != LAST_RULES:
             security.command(['nft', '-f', '-'], script); LAST_RULES = script
@@ -548,9 +555,9 @@ def activate(plan, state, management):
             REPORTER = reporting.Collector(settings, plan['interfaces'], STATE)
         for profile in profiles:
             name = 'parental-' + str(profile['id']); path = security.RUN / (name + '.conf')
-            study = in_mode(profile, 'study_windows', settings['timezone'])
-            security.write(path, dns_config(profile, settings, ports[profile['interface']], feeds, management, study))
-            DNS_MODES[profile['id']] = study
+            mode = dns_mode(profile, settings['timezone'])
+            security.write(path, dns_config(profile, settings, ports[profile['interface']], feeds, management, *mode))
+            DNS_MODES[profile['id']] = mode
             security.command(['dnsmasq', '--test', '--conf-file=' + str(path)])
             args = ['dnsmasq', '--keep-in-foreground', '--conf-file=' + str(path), '--pid-file=']
             if REPORTER is not None:
@@ -673,18 +680,18 @@ def replace_dns(feeds, now=None):
         for p in active_profiles(settings):
             ident = p['id']; path = security.RUN / ('parental-' + str(ident) + '.conf')
             old[ident] = path.read_text()
-            study = in_mode(p, 'study_windows', settings['timezone'], now)
-            data = dns_config(p, settings, ports[p['interface']], feeds, MANAGEMENT, study)
+            mode = dns_mode(p, settings['timezone'], now)
+            data = dns_config(p, settings, ports[p['interface']], feeds, MANAGEMENT, *mode)
             check = path.with_suffix('.candidate')
             security.write(check, data)
             try:
                 security.command(['dnsmasq', '--test', '--conf-file=' + str(check)])
             finally:
                 check.unlink(missing_ok=True)
-            candidates[ident] = (path, data, study)
-        for ident, (path, data, study) in candidates.items():
+            candidates[ident] = (path, data, mode)
+        for ident, (path, data, mode) in candidates.items():
             touched.append(ident)
-            security.write(path, data); start_resolver(ident); DNS_MODES[ident] = study
+            security.write(path, data); start_resolver(ident); DNS_MODES[ident] = mode
     except Exception as exc:
         failures = []
         for ident in touched:
@@ -700,7 +707,7 @@ def replace_dns(feeds, now=None):
 
 def synchronize_dns(now=None):
     settings = CURRENT['settings']; stamp = time.monotonic()
-    changed = [p for p in active_profiles(settings) if DNS_MODES.get(p['id']) != in_mode(p, 'study_windows', settings['timezone'], now)]
+    changed = [p for p in active_profiles(settings) if DNS_MODES.get(p['id']) != dns_mode(p, settings['timezone'], now)]
     if not changed or any(DNS_RETRY.get(p['id'], 0) > stamp for p in changed):
         return
     try:

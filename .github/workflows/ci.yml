@@ -167,7 +167,7 @@ jobs:
           MURUS_BUILD_SEED_IMAGE: dyne/devuan:excalibur@sha256:10f6138df94c08164f300a2f35f96cd8c8966fc4948550dbe0485149d020248f
         run: bash tools/build-devuan-iso.sh
       - name: Install disposable UEFI test tools
-        run: apt-get install -y --no-install-recommends qemu-system-x86 ovmf python3-pexpect
+        run: apt-get install -y --no-install-recommends qemu-system-x86 ovmf python3-pexpect openssh-client
       - name: Boot original ISO and run real network acceptance in guest
         run: MURUS_LAB=YES python3 tools/validate-iso-networking.py
       - name: Save ISO, checksums and package manifest
@@ -184,22 +184,22 @@ jobs:
             dist/signature-status.txt
             dist/bootstrap-provenance.json
             dist/clamav-build.log
-            dist/alpha11-iso-networking-qa.json
-            dist/alpha11-iso-console.log
+            dist/alpha12-iso-networking-qa.json
+            dist/alpha12-iso-console.log
           compression-level: 0
           retention-days: 2
 
 
 
       - name: Preserve tested ISO in a private draft if Actions storage is full
-        if: success() && steps.upload_iso.outcome == 'failure' && github.event_name == 'push' && !contains(github.event.head_commit.message, '[publish alpha.11]')
+        if: success() && steps.upload_iso.outcome == 'failure' && github.event_name == 'push' && !contains(github.event.head_commit.message, '[publish alpha.12]')
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 tools/stage-candidate-release.py
 
-      - name: Publish alpha.11 only after all tests and original ISO acceptance
-        if: success() && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[publish alpha.11]')
+      - name: Publish alpha.12 only after all tests and original ISO acceptance
+        if: success() && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[publish alpha.12]')
         env:
           GH_TOKEN: ${{ github.token }}
-          MURUS_PUBLISH_RELEASE: 0.3.0-alpha.11
+          MURUS_PUBLISH_RELEASE: 0.3.0-alpha.12
         run: python3 tools/stage-candidate-release.py

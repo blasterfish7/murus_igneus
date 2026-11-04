@@ -9,7 +9,7 @@ output=$(CDPATH='' cd -- "$output" && pwd)
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT HUP INT TERM
 install -d "$stage/DEBIAN" "$stage/usr/lib/murus-igneus" "$stage/usr/sbin" "$stage/etc/init.d" "$stage/etc/default" "$stage/usr/share/doc/murus-igneus" "$stage/etc/sysctl.d"
-for file in __init__.py server.py configuration.py migration.py security.py avproxy.py jobs.py installer.py networking.py dhcp_client.py traffic.py parental_report.py parental.py parental.js eventlog.py authentication.py enterprise.py enterprise.js updates.py network.js tasks.py assistant.py switches.py management.js index.html app.js style.css LICENSE-MIT; do
+for file in __init__.py server.py configuration.py migration.py security.py avproxy.py jobs.py installer.py networking.py dhcp_client.py traffic.py parental_report.py parental.py parental.js eventlog.py authentication.py admin_ssh.py enterprise.py enterprise.js updates.py network.js tasks.py assistant.py switches.py management.js index.html app.js style.css LICENSE-MIT; do
     install -m 0644 "$root/src/murus_igneus/$file" "$stage/usr/lib/murus-igneus/$file"
 done
 for file in murus-serve murus-prepare murus-info murus-update murus-install; do
@@ -32,7 +32,7 @@ install -m 0644 "$root/docs/ALPHA5.md" "$stage/usr/share/doc/murus-igneus/ALPHA5
 install -m 0644 "$root/docs/PARENTAL.md" "$stage/usr/share/doc/murus-igneus/PARENTAL.md"
 cat > "$stage/DEBIAN/control" <<'EOF'
 Package: murus-igneus
-Version: 0.3.0~alpha.11
+Version: 0.3.0~alpha.12
 Section: net
 Priority: optional
 Architecture: all
@@ -77,6 +77,6 @@ if [ "${1:-}" = configure ]; then
 fi
 EOF
 chmod 0755 "$stage/DEBIAN/preinst" "$stage/DEBIAN/prerm" "$stage/DEBIAN/postinst"
-dpkg-deb --root-owner-group --build "$stage" "$output/murus-igneus_0.3.0~alpha.11_all.deb"
+dpkg-deb --root-owner-group --build "$stage" "$output/murus-igneus_0.3.0~alpha.12_all.deb"
 
 

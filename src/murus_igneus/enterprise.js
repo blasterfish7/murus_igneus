@@ -40,7 +40,28 @@
     }
     show('enterprise-page');
   }
-  el('nav').append(button('VPN IPsec e doppia WAN', edit),button('Amministrazione',()=>show('admin-page')));
+  const sshPanel=document.createElement('section');sshPanel.className='panel';
+  sshPanel.innerHTML=`<h3>Accesso SSH</h3><p>TCP 22 sulla porta di gestione, da sorgenti autorizzate. Accesso root con chiave pubblica Ed25519. Incolla il contenuto del file .pub.</p>
+  <p id="ssh-state" role="status"></p><form id="ssh-form">
+  <label><input type="checkbox" id="ssh-enabled"> Abilita SSH</label>
+  <label>Indirizzi IPv4 o reti autorizzate, una per riga<textarea id="ssh-sources" rows="3" placeholder="192.168.56.10/32"></textarea></label>
+  <label>Chiavi pubbliche SSH, una per riga<textarea id="ssh-keys" rows="3" placeholder="ssh-ed25519 AAAA…"></textarea></label>
+  <button>Salva SSH nella bozza</button></form>`;
+  admin.append(sshPanel);
+  async function openAdmin(){
+    show('admin-page');if(!config)return;
+    const ssh=config.admin_ssh||{enabled:false,sources:[],keys:[]};
+    el('ssh-enabled').checked=ssh.enabled;el('ssh-sources').value=ssh.sources.join('\n');el('ssh-keys').value=ssh.keys.join('\n');
+    el('ssh-state').textContent='Verifica del servizio…';
+    try{const state=await api('admin-ssh');el('ssh-state').textContent=state.live?'SSH si abilita dopo l’installazione su disco.':!state.available?'OpenSSH assente: installare openssh-server dalla console.':state.running?'Servizio SSH in esecuzione.':'Servizio SSH spento.';}catch(exc){el('ssh-state').textContent=exc.message;}
+  }
+  el('ssh-form').onsubmit=event=>{
+    event.preventDefault();if(!config)return;if(pending)return error('Conferma o annulla la modifica pendente');
+    const lines=id=>el(id).value.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+    config.admin_ssh={enabled:el('ssh-enabled').checked,sources:lines('ssh-sources'),keys:lines('ssh-keys')};
+    invalidate();show('review-page');
+  };
+  el('nav').append(button('VPN IPsec e doppia WAN', edit),button('Amministrazione',openAdmin));
   el('ipsec-add').onclick = () => { if(tunnels.length >=16)return error('Massimo 16 tunnel'); tunnels.push({id:Array.from({length:16},(_,i)=>i+1).find(id=>!tunnels.some(r=>r.id===id)), enabled:false}); renderTunnels(); };
   el('ipsec-form').onsubmit = event => {event.preventDefault();if(pending)return error('Conferma o annulla la modifica pendente');config.ipsec=structuredClone(tunnels);invalidate();show('review-page');};
   el('wan-form').onsubmit = event => {event.preventDefault();if(pending)return error('Conferma o annulla la modifica pendente'); const enabled=el('wan-enabled').checked;
