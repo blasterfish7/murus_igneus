@@ -69,7 +69,7 @@ for name in dev proc sys; do
     mount --make-rslave "$root/$name"
 done
 chroot "$root" apt-get update
-chroot "$root" apt-get install -y --no-install-recommends linux-image-amd64 live-boot initramfs-tools sysvinit-core openrc ifupdown isc-dhcp-client kmod python3 python3-yaml snmp dnsmasq-base udhcpc nftables iproute2 openssl conntrack wireguard-tools strongswan-charon strongswan-swanctl libcharon-extra-plugins libstrongswan-standard-plugins iputils-ping dpkg-repack suricata suricata-update clamav clamav-daemon clamav-freshclam rsync fdisk parted dosfstools e2fsprogs grub-pc-bin grub-efi-amd64-bin grub2-common ca-certificates tzdata curl
+chroot "$root" apt-get install -y --no-install-recommends linux-image-amd64 live-boot initramfs-tools sysvinit-core openrc ifupdown isc-dhcp-client kmod python3 python3-yaml snmp dnsmasq-base udhcpc nftables iproute2 openssl openssh-server conntrack wireguard-tools strongswan-charon strongswan-swanctl libcharon-extra-plugins libstrongswan-standard-plugins iputils-ping dpkg-repack suricata suricata-update clamav clamav-daemon clamav-freshclam rsync fdisk parted dosfstools e2fsprogs grub-pc-bin grub-efi-amd64-bin grub2-common ca-certificates tzdata curl
 bash "$project/packaging/devuan/build-deb.sh" "$out"
 cp "$out/murus-igneus_0.3.0~alpha.11_all.deb" "$root/tmp/murus.deb"
 chroot "$root" dpkg -i /tmp/murus.deb
@@ -111,7 +111,7 @@ touch "$root/etc/murus_igneus/live-image"
 printf '\nT0:2345:respawn:/sbin/agetty -L ttyS0 115200 vt100\n' >> "$root/etc/inittab"
 chroot "$root" rc-update add murus-igneus default
 # Murus owns these processes and starts them only after validated configuration.
-for service in suricata clamav-daemon clamav-freshclam ipsec strongswan strongswan-starter; do
+for service in ssh suricata clamav-daemon clamav-freshclam ipsec strongswan strongswan-starter; do
     if [[ -f "$root/etc/init.d/$service" ]]; then
         chroot "$root" update-rc.d "$service" disable
     fi

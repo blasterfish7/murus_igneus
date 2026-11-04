@@ -9,6 +9,7 @@ import re
 import shutil
 import socket
 import ssl
+import subprocess
 import time
 import urllib.request
 import urllib.error
@@ -30,13 +31,15 @@ with tempfile.TemporaryDirectory(prefix='murus-iso-qa-') as work:
     with disk.open('wb') as file:file.truncate(16*1024**3)
     with socket.socket() as listener:
         listener.bind(('127.0.0.1',0));web_port=listener.getsockname()[1]
+        with socket.socket() as ssh_listener:
+            ssh_listener.bind(('127.0.0.1',0));ssh_port=ssh_listener.getsockname()[1]
     variables = Path(work) / 'vars.fd'; shutil.copyfile(template, variables)
     args = ['qemu-system-x86_64', '-machine', 'q35,accel=tcg', '-cpu', 'max', '-smp', '2', '-m', '2048',
             '-drive', 'if=pflash,format=raw,readonly=on,file=' + str(code), '-drive', 'if=pflash,format=raw,file=' + str(variables),
             '-display', 'none', '-serial', 'stdio', '-monitor', 'none', '-no-reboot', '-boot', 'd', '-cdrom', str(iso)]
     args += ['-drive','file='+str(disk)+',if=virtio,format=raw']
     for index in range(3):
-        args += ['-netdev', f'user,id=n{index}'+(f',hostfwd=tcp:127.0.0.1:{web_port}-:8443' if index==0 else ''), '-device', f'virtio-net-pci,netdev=n{index},romfile=']
+        args += ['-netdev', f'user,id=n{index}'+(f',hostfwd=tcp:127.0.0.1:{web_port}-:8443,hostfwd=tcp:127.0.0.1:{ssh_port}-:22' if index==0 else ''), '-device', f'virtio-net-pci,netdev=n{index},romfile=']
     child = pexpect.spawn(args[0], args[1:], encoding='utf-8', timeout=360)
     log = (ROOT / 'dist/alpha11-iso-console.log').open('w'); child.logfile = log
     try:
@@ -208,9 +211,9 @@ print('ISO_ROOT_PARENTAL_APPLY_ROLLBACK_OK')
         command("python3 -c \"import base64,gzip;from pathlib import Path;Path('/tmp/murus-qa/tools/validate-parental-runtime.py').write_bytes(gzip.decompress(base64.b64decode(Path('/tmp/murus-qa/parental.b64').read_bytes())))\"")
         command('MURUS_LAB=YES unshare --mount --net --fork python3 /tmp/murus-qa/tools/validate-parental-runtime.py', timeout=360)
         parental_report = json.loads(re.search(r'MIQA_PARENTAL=(\{[^\r\n]+\})', command("python3 -c \"import json;print('MIQA_PARENTAL='+json.dumps(json.load(open('/tmp/murus-qa/dist/parental-runtime-qa.json'))))\"")).group(1))
-        assert parental_report['success'] and len(parental_report['checks']) == 23, parental_report
+        assert parental_report['success'] and len(parental_report['checks']) == 24, parental_report
         checks += ['Devuan ISO: ' + item for item in parental_report['checks']]
-        print('PASS parental packet suite on original ISO: 23 checks', flush=True)
+        print('PASS parental packet suite on original ISO: 24 checks', flush=True)
         payload = base64.b64encode(gzip.compress((ROOT / 'tools/validate-dhcp-client-runtime.py').read_bytes())).decode()
         command(': > /tmp/murus-qa/dhcp-client.b64')
         for pos in range(0,len(payload),1000):
@@ -246,6 +249,48 @@ print('ISO_ROOT_PARENTAL_APPLY_ROLLBACK_OK')
         else:raise AssertionError('Installed disk HTTPS unavailable')
         assert json.loads(web('api/installer'))['live'] is False
         checks.append('Installed disk boots independently with the ISO detached and serves management HTTPS through the NIC');print('PASS '+checks[-1],flush=True)
+        key = Path(work)/'qa-ssh'
+        wrong_key = Path(work)/'qa-ssh-wrong'
+        for path in (key, wrong_key):
+            subprocess.run(['ssh-keygen','-q','-t','ed25519','-N','','-f',str(path)],check=True)
+        def ssh(identity=key):
+            return subprocess.run(['ssh','-F','/dev/null','-p',str(ssh_port),'-i',str(identity),
+                                   '-oBatchMode=yes','-oIdentitiesOnly=yes','-oConnectTimeout=4',
+                                   '-oStrictHostKeyChecking=accept-new','-oUserKnownHostsFile='+str(Path(work)/'qa-known-hosts'),
+                                   'root@127.0.0.1','printf MURUS_SSH_OK'],capture_output=True,text=True,timeout=8)
+        ssh_state=json.loads(web('api/admin-ssh'))
+        assert ssh_state == {'available':True,'live':False,'running':False},ssh_state
+        assert ssh().returncode != 0
+        checks.append('OpenSSH is present on installed Devuan but TCP 22 does not offer SSH by default')
+        remote_csrf=json.loads(web('api/status'))['csrf']
+        initial_config=json.loads(web('api/configuration'))['configuration']
+        def apply_config(config,confirm=False):
+            plan=json.loads(web('api/configuration/preview',{'configuration':config}))
+            assert plan['ready'],plan['blockers']
+            ident=json.loads(web('api/apply',{'plan_id':plan['plan_id']}))['id']
+            if confirm:assert json.loads(web('api/confirm',{'id':ident}))['ok']
+        enabled={**initial_config,'admin_ssh':{'enabled':True,'sources':['10.0.2.2/32'],
+                                               'keys':[key.with_suffix('.pub').read_text().strip()]}}
+        apply_config(enabled,True)
+        success=ssh()
+        assert success.returncode==0 and success.stdout=='MURUS_SSH_OK',success.stderr
+        rejected=ssh(wrong_key)
+        assert rejected.returncode!=0 and 'Permission denied (publickey)' in rejected.stderr,rejected.stderr
+        checks.append('Real HTTPS apply enables OpenSSH from the management IPv4 with the authorized Ed25519 key only')
+        denied={**enabled,'admin_ssh':{**enabled['admin_ssh'],'sources':['198.51.100.10/32']}}
+        apply_config(denied)
+        assert ssh().returncode!=0 and json.loads(web('api/admin-ssh'))['running']
+        assert json.loads(web('api/rollback',{}))['ok']
+        assert ssh().stdout=='MURUS_SSH_OK'
+        checks.append('Actual SSH traffic from outside the allowlist is denied and web rollback restores the previous SSH policy')
+        command('rc-service murus-igneus restart',timeout=90)
+        remote_csrf=json.loads(web('api/status'))['csrf']
+        assert ssh().stdout=='MURUS_SSH_OK'
+        apply_config(initial_config,True)
+        assert not json.loads(web('api/admin-ssh'))['running'] and ssh().returncode!=0
+        command('rm -f /etc/murus_igneus/ssh_host_ed25519_key /etc/murus_igneus/ssh_host_ed25519_key.pub')
+        checks.append('Confirmed SSH access and host identity survive restart; disabling closes TCP 22')
+        print('PASS SSH installed-disk suite: 4 checks',flush=True)
         command(': > /tmp/murus-updates-runtime.b64')
         updates_payload = base64.b64encode(gzip.compress((ROOT/'tools/validate-updates-runtime.py').read_bytes())).decode()
         for pos in range(0,len(updates_payload),1000):

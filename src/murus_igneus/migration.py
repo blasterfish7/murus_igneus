@@ -72,6 +72,7 @@ table inet murus_igneus {{
  chain input {{ type filter hook input priority 0; policy drop;
   iifname "lo" accept
   ct state invalid drop
+  tcp dport 22 drop comment "Murus SSH disabled unless explicitly allowed"
   ct state established,related accept
   iifname {Q(management)} tcp dport 8443 accept comment "Murus anti-lockout HTTPS"
   iifname {Q(management)} udp sport 67 udp dport 68 accept

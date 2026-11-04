@@ -17,11 +17,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 try:
     from .migration import VERSION, baseline, Error
     from .configuration import compile_config, from_backup, empty
-    from . import security, installer, jobs, assistant, switches, networking, traffic, enterprise, authentication, eventlog, parental, updates
+    from . import security, installer, jobs, assistant, switches, networking, traffic, enterprise, authentication, eventlog, parental, updates, admin_ssh
 except ImportError:
     from migration import VERSION, baseline, Error
     from configuration import compile_config, from_backup, empty
-    import security, installer, jobs, assistant, switches, networking, traffic, enterprise, authentication, eventlog, parental, updates
+    import security, installer, jobs, assistant, switches, networking, traffic, enterprise, authentication, eventlog, parental, updates, admin_ssh
 
 STATE=Path('/etc/murus_igneus');MGMT=os.environ.get('MURUS_MANAGEMENT_INTERFACE','eth0');LOCK=threading.RLock()
 if not re.fullmatch(r'[A-Za-z0-9_.-]{1,15}',MGMT) or MGMT=='lo':raise ValueError('Interfaccia di gestione non valida')
@@ -203,6 +203,9 @@ def undo_network(args):
         # A failed command is harmless only when the intended state is actually verified.
         if not undo_satisfied(args):raise
 
+def ssh_settings(plan):
+    return (plan or {}).get('configuration', {}).get('admin_ssh', {})
+
 def rollback(ident):
     global PENDING,LAST
     with LOCK:
@@ -215,6 +218,7 @@ def rollback(ident):
         try:
             # Do not change interfaces/services unless transit has first been closed.
             if attempt('Regole di sicurezza iniziali',run,['nft','-f','-'],baseline(MGMT)):
+                attempt('Arresto SSH',admin_ssh.stop)
                 attempt('Arresto parental',parental.stop)
                 attempt('Arresto VPN/WAN',enterprise.stop)
                 attempt('Arresto DNS/DHCP',networking.stop)
@@ -223,6 +227,7 @@ def rollback(ident):
                 attempt('Ripristino DNS/DHCP',networking.activate,service_settings(ACTIVE),MGMT)
                 attempt('Ripristino VPN/WAN',enterprise.activate,ACTIVE.get('enterprise',enterprise.defaults()) if ACTIVE else enterprise.defaults(),ACTIVE.get('configuration',{}).get('interfaces',[]) if ACTIVE else [])
                 attempt('Preparazione parental',parental.stage,ACTIVE.get('parental') if ACTIVE else None)
+                if not errors:attempt('Ripristino SSH',admin_ssh.start,ssh_settings(ACTIVE),STATE)
                 if not errors and attempt('Regole precedenti',run,['nft','-f','-'],p['old']):
                     attempt('Ripristino parental',parental.activate,ACTIVE.get('parental') if ACTIVE else None,STATE,MGMT)
             attempt('Pulizia conntrack',run,['conntrack','-F'])
@@ -231,7 +236,9 @@ def rollback(ident):
             errors.append('Ripristino: '+str(exc)[:300])
         finally:
             # Any incomplete recovery keeps a management-only firewall, where nft is available.
-            if errors:attempt('Fallback regole di sicurezza',lambda:run(['nft','-f','-'],baseline(MGMT)))
+            if errors:
+                attempt('Fallback regole di sicurezza',lambda:run(['nft','-f','-'],baseline(MGMT)))
+                attempt('Arresto SSH di sicurezza',admin_ssh.stop)
             PENDING=None
             detail=errors if len(errors)<=8 else errors[:7]+errors[-1:]
             LAST='Ripristino servizi fallito: '+'; '.join(detail) if errors else 'Modifica annullata; ripristinata la configurazione precedente'
@@ -245,12 +252,14 @@ def apply(plan):
     if (switches.TASK.status() or {}).get('state')=='running':raise Error('Attendere l’operazione switch prima di applicare il firewall')
     if not plan or not plan['ready']:raise Error('Migrazione non validata o con incompatibilità')
     parental.preflight(plan.get('parental'),STATE)
+    admin_ssh.preflight(ssh_settings(plan),STATE)
     check_enterprise_management(plan)
     run(['nft','--check','-f','-'],plan['nftables'])
     old=run(['nft','list','table','inet','murus_igneus']);ident=secrets.token_hex(16)
     PENDING={'id':ident,'deadline':time.time()+90,'undo':[],'old':'add table inet murus_igneus\nflush table inet murus_igneus\n'+old,'forward':Path('/proc/sys/net/ipv4/ip_forward').read_text().strip(),'plan':plan,'security':ACTIVE.get('security',security.defaults()) if ACTIVE else security.defaults()}
     try:
         run(['nft','-f','-'],baseline(MGMT))
+        admin_ssh.stop()
         parental.stop()
         enterprise.stop()
         networking.stop()
@@ -262,6 +271,7 @@ def apply(plan):
         networking.activate(service_settings(plan),MGMT)
         parental.stage(plan.get('parental'))
         enterprise.activate(plan.get('enterprise',enterprise.defaults()),plan.get('configuration',{}).get('interfaces',[]))
+        admin_ssh.start(ssh_settings(plan),STATE)
         run(['nft','-f','-'],plan['nftables'])
         parental.activate(plan.get('parental'),STATE,MGMT)
         run(['conntrack','-F']);run(['sysctl','-w','net.ipv4.ip_forward=1'])
@@ -326,6 +336,7 @@ class Handler(BaseHTTPRequestHandler):
             with LOCK:
                 if self.path=='/api/events':self.reply(200,eventlog.history(STATE))
                 elif self.path in ('/api/parental/report/1','/api/parental/report/7'):self.reply(200,parental.reporting.report(STATE,int(self.path[-1])))
+                elif self.path=='/api/admin-ssh':self.reply(200,admin_ssh.inventory(STATE))
                 elif self.path=='/api/parental':self.reply(200,parental.inventory(STATE))
                 elif self.path=='/api/enterprise':self.reply(200,enterprise.health())
                 elif self.path=='/api/configuration':self.reply(200,{'configuration':ACTIVE.get('configuration') if ACTIVE else {**empty(),**security.defaults(),**networking.defaults(),**enterprise.defaults(),**parental.defaults()},'legacy':bool(ACTIVE and not ACTIVE.get('configuration'))})
@@ -465,10 +476,12 @@ def main():
             networking.activate(service_settings(plan),MGMT)
             enterprise.activate(plan.get('enterprise',enterprise.defaults()),plan.get('configuration',{}).get('interfaces',[]))
             parental.stage(plan.get('parental'))
+            admin_ssh.start(ssh_settings(plan),STATE)
             run(['nft','-f','-'],plan['nftables'])
             parental.activate(plan.get('parental'),STATE,MGMT)
             run(['sysctl','-w','net.ipv4.ip_forward=1']);LAST='Configurazione salvata ripristinata';ACTIVE=plan
         except Exception as e:
+            admin_ssh.stop()
             parental.stop()
             enterprise.stop()
             networking.stop()
@@ -495,6 +508,7 @@ if __name__=='__main__':
         with LOCK:
             run(['nft','-f','-'],baseline(MGMT),check=False)
             run(['sysctl','-w','net.ipv4.ip_forward=0'],check=False)
+            admin_ssh.stop()
             parental.stop()
             enterprise.stop()
             networking.stop()

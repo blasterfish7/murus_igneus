@@ -140,12 +140,13 @@ _compile_base=compile_config
 def compile_config(config,management='eth0'):
     import copy
     try:
-        from . import security, networking, enterprise, parental
+        from . import security, networking, enterprise, parental, admin_ssh
     except ImportError:
-        import security, networking, enterprise, parental
+        import security, networking, enterprise, parental, admin_ssh
     if not isinstance(config,dict):raise Error('Configurazione non valida')
+    ssh_settings=admin_ssh.validate(config.get('admin_ssh',admin_ssh.defaults()))
     parent_settings=parental.validate(config,management)
-    config={k:v for k,v in config.items() if k!='parental'}
+    config={k:v for k,v in config.items() if k not in ('parental','admin_ssh')}
     extensions=enterprise.validate(config,management)
     config={k:v for k,v in config.items() if k not in extensions}
     settings=security.validate(config,management)
@@ -175,6 +176,7 @@ def compile_config(config,management='eth0'):
     plan['configuration'].update(extensions);plan['enterprise']=extensions
     plan['nftables']=enterprise.decorate(plan['nftables'],extensions,interfaces)
     parental.decorate(plan,parent_settings,interfaces)
+    admin_ssh.decorate(plan,ssh_settings,management)
     plan['version']=VERSION
     return plan
 

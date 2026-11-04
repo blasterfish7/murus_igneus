@@ -18,7 +18,7 @@ sys.path.insert(0,str(ROOT/'src/murus_igneus'))
 from migration import VERSION
 assert re.fullmatch(r'0\.3\.0-alpha\.[0-9]+',VERSION)
 LABEL=VERSION.removeprefix('0.3.0-').replace('.','')
-ISO_CHECKS=73
+ISO_CHECKS=78
 API = 'https://api.github.com/repos/' + REPO
 PUBLISH = os.environ.get('MURUS_PUBLISH_RELEASE')
 if PUBLISH:
@@ -70,7 +70,7 @@ existing = request(API + '/releases?per_page=100')
 release = next((r for r in existing if r['tag_name'] == tag), None)
 if release is None:
     notes = ('Alpha.11: dynamic dashboard, visual network ports and signed application update staging, installation, backup/rollback and interrupted-job recovery. '
-             'Original ISO passed 73 UEFI/live/install/cold-boot and actual installed update checks after Python, Chromium and packet suites. '
+             'Original ISO passed 78 UEFI/live/install/cold-boot and actual installed update checks after Python, Chromium and packet suites. '
              'See the attached Italian installation/bootstrap guide. Existing alpha.10 needs manual trusted DEB or new ISO bootstrap. '
              'Production Ed25519 signing/trust is not provisioned by this release; DEB/checksums are not a signed web-update bundle. '
              'Application updates only; no OS/kernel upgrade, HA, HTTPS antivirus inspection or guaranteed hard-power-cut recovery. '

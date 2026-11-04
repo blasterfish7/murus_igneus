@@ -33,7 +33,7 @@
     el('parental-profiles').replaceChildren();
     for(const row of profiles){
       const card=document.createElement('article');card.className='switch-card';card.append(text('h3',`${row.name || 'Figlio'} · Profilo ${row.id}`));
-      Object.assign(row,{devices:row.devices||[],safe_search:row.safe_search||false,youtube_restricted:row.youtube_restricted||'off',study_windows:row.study_windows||[],study_domains:row.study_domains||[],night_windows:row.night_windows||[],block_ipv6:row.block_ipv6||false});
+      Object.assign(row,{devices:row.devices||[],safe_search:row.safe_search||false,youtube_restricted:row.youtube_restricted||'off',social_windows:row.social_windows||[],social_services:row.social_services||[],study_windows:row.study_windows||[],study_domains:row.study_domains||[],night_windows:row.night_windows||[],block_ipv6:row.block_ipv6||false});
       const name=field(card,'Nome profilo',row.name);name.required=true;name.maxLength=80;name.oninput=()=>{row.name=name.value;const title=card.closest('.profile-panel')?.querySelector('.profile-name');if(title)title.textContent=row.name||'Nuovo profilo';};
       checkbox(card,'Profilo abilitato',row.enabled,v=>{row.enabled=v;const meta=card.closest('.profile-panel')?.querySelector('.profile-meta');if(meta)meta.textContent=`${row.clients.length} indirizzi / subnet · ${v?'Abilitato nella bozza':'Disabilitato'}`;});
       const label=document.createElement('label');label.textContent='LAN protetta';const port=document.createElement('select');
@@ -60,9 +60,17 @@
       card.append(text('h4','Categorie'));
       for(const [id,title] of [['adult','Contenuti per adulti'],['gambling','Gioco d’azzardo'],['malware','Malware e phishing'],['bypass','Resolver cifrati e strumenti di aggiramento noti']])checkbox(card,title,row.categories.includes(id),v=>{row.categories=v?[...row.categories,id]:row.categories.filter(x=>x!==id);});
       card.append(text('h4','Servizi da bloccare'));
-      for(const id of ['instagram','tiktok','facebook','youtube','snapchat','discord','twitch'])checkbox(card,id,row.services.includes(id),v=>{row.services=v?[...row.services,id]:row.services.filter(x=>x!==id);});
+      for(const id of ['instagram','tiktok','facebook','youtube','snapchat','whatsapp','discord','twitch'])checkbox(card,id,row.services.includes(id),v=>{row.services=v?[...row.services,id]:row.services.filter(x=>x!==id);});
       const blocked=field(card,'Domini aggiuntivi bloccati (inclusi i sottodomini)',row.blocked_domains.join('\n'),'textarea');blocked.oninput=()=>{row.blocked_domains=values(blocked);};
       const allowed=field(card,'Eccezioni consentite (prevalgono sui blocchi dei domini)',row.allowed_domains.join('\n'),'textarea');allowed.oninput=()=>{row.allowed_domains=values(allowed);};
+      card.append(text('h4','Servizi bloccati solo nelle fasce social'),text('p','Le categorie, come il filtro adulti, restano attive tutto il giorno. I servizi selezionati anche nel blocco permanente restano sempre bloccati.'));
+      for(const id of ['instagram','whatsapp','tiktok','facebook','snapchat','discord','youtube','twitch'])checkbox(card,'A orario: '+id,row.social_services.includes(id),v=>{row.social_services=v?[...row.social_services,id]:row.social_services.filter(x=>x!==id);});
+      card.append(button('Blocca WhatsApp e Instagram · lun–ven 15:00–19:00',()=>{
+        row.social_services=[...new Set([...row.social_services,'whatsapp','instagram'])];
+        row.services=row.services.filter(id=>!['whatsapp','instagram'].includes(id));
+        row.social_windows=[{days:[0,1,2,3,4],start:'15:00',end:'19:00'}];row.enforce_dns=true;render();
+      }));
+      windowEditor(card,row,'social_windows');
       card.append(text('h4','Fasce in cui Internet è consentito'));
       card.append(text('p','Senza fasce: nessun limite orario. Inizio incluso, fine esclusa. Una fascia 22:00–07:00 continua nel giorno successivo. Controlli ogni 2 secondi; verifica l’ora del firewall. Le eccezioni dei domini non superano pause e orari.'));
       windowEditor(card,row,'windows');
@@ -86,7 +94,7 @@
       const end=field(box,'Alle',window.end,'time');end.required=true;end.oninput=()=>{window.end=end.value;};
       box.append(button('Rimuovi fascia',()=>{row[key]=row[key].filter(w=>w!==window);render();}));card.append(box);
     }
-    card.append(button(key==='windows'?'Aggiungi fascia':key==='night_windows'?'Aggiungi fascia notte':'Aggiungi fascia compiti',()=>{if(row[key].length>=28)return error('Massimo 28 fasce');row[key].push({days:[0,1,2,3,4],start:'16:00',end:'20:00'});render();}));
+    card.append(button(key==='windows'?'Aggiungi fascia':key==='night_windows'?'Aggiungi fascia notte':key==='social_windows'?'Aggiungi fascia social':'Aggiungi fascia compiti',()=>{if(row[key].length>=28)return error('Massimo 28 fasce');row[key].push({days:[0,1,2,3,4],start:'16:00',end:'20:00'});render();}));
   }
   async function refresh(){
     const data=await api('parental');el('parental-feeds').replaceChildren();
@@ -96,6 +104,7 @@
     el('parental-runtime-state').textContent=data.error?`Errore del controllo: ${data.error}`:data.running?'Parental control attivo':'Parental control disabilitato';el('parental-runtime').replaceChildren();
     for(const row of data.profiles){const card=document.createElement('article');card.append(text('h4',row.name),text('p',row.blocked?`Accesso bloccato: ${row.reason}`:'Accesso consentito negli orari configurati, con filtri DNS attivi'));
       if(row.ipv6_blocked_lan)card.append(text('p','IPv6 bloccato su tutta la LAN, anche per gli altri dispositivi.'));
+      if(row.social)card.append(text('p','Fascia social attiva: blocco DNS dei servizi programmati.'));
       if(row.study)card.append(text('p','Modalità compiti attiva: DNS limitato ai domini scolastici.'));
       if(row.bonus_until)card.append(text('p','Bonus fino a '+new Date(row.bonus_until*1000).toLocaleString()));
       for(const device of row.devices||[])card.append(text('p',`${device.name} · ${device.address}`));

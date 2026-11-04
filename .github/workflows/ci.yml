@@ -167,7 +167,7 @@ jobs:
           MURUS_BUILD_SEED_IMAGE: dyne/devuan:excalibur@sha256:10f6138df94c08164f300a2f35f96cd8c8966fc4948550dbe0485149d020248f
         run: bash tools/build-devuan-iso.sh
       - name: Install disposable UEFI test tools
-        run: apt-get install -y --no-install-recommends qemu-system-x86 ovmf python3-pexpect
+        run: apt-get install -y --no-install-recommends qemu-system-x86 ovmf python3-pexpect openssh-client
       - name: Boot original ISO and run real network acceptance in guest
         run: MURUS_LAB=YES python3 tools/validate-iso-networking.py
       - name: Save ISO, checksums and package manifest

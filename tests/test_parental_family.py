@@ -47,6 +47,23 @@ class FamilyTests(unittest.TestCase):
         self.c['parental']['profiles'][0]['study_windows'] = [{'days':[0],'start':'16:00','end':'18:00'}]
         with self.assertRaises(ValueError): compile_config(self.c)
 
+    def test_social_window_keeps_always_on_adult_filter(self):
+        profile = self.c['parental']['profiles'][0]
+        profile.update(services=[], categories=['adult'], social_services=['instagram','whatsapp'],
+                       social_windows=[{'days':[0,1,2,3,4],'start':'15:00','end':'19:00'}])
+        settings = compile_config(self.c)['parental']['settings']
+        profile = settings['profiles'][0]
+        for hour, minute, enabled in ((13,59,False),(14,0,True),(17,59,True),(18,0,False)):
+            with self.subTest(hour=hour,minute=minute):
+                mode = parental.dns_mode(profile, settings['timezone'], datetime(2026,10,26,hour,minute,tzinfo=timezone.utc))
+                self.assertEqual(mode, (False,enabled))
+                text = parental.dns_config(profile,settings,self.plan['interfaces'][0],{'adult':['adult.test']},'eth0',*mode)
+                self.assertIn('local=/adult.test/',text)
+                for service in ('instagram.com','whatsapp.com','whatsapp.net'):
+                    self.assertEqual('local=/'+service+'/' in text, enabled)
+        self.c['parental']['profiles'][0]['enforce_dns'] = False
+        with self.assertRaises(ValueError):compile_config(self.c)
+
     def test_school_dns_is_allowlist_and_cannot_open_ordinary_exceptions(self):
         self.p.update(study_domains=['school.test'], allowed_domains=['ordinary.test'])
         text = parental.dns_config(self.p, self.s, self.plan['interfaces'][0], {}, 'eth0', study=True)
