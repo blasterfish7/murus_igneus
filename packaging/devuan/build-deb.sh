@@ -18,6 +18,8 @@ done
 install -d "$stage/etc/profile.d"
 install -m 0644 "$root/packaging/devuan/files/murus-welcome.sh" "$stage/etc/profile.d/murus-welcome.sh"
 install -m 0755 "$root/packaging/devuan/files/murus-igneus.initd" "$stage/etc/init.d/murus-igneus"
+install -m 0755 "$root/packaging/devuan/files/murus-guest-agent.initd" "$stage/etc/init.d/murus-guest-agent"
+install -m 0644 "$root/docs/PROXMOX.md" "$stage/usr/share/doc/murus-igneus/PROXMOX.md"
 install -m 0644 "$root/packaging/devuan/files/murus-igneus.default" "$stage/etc/default/murus-igneus"
 install -m 0644 "$root/packaging/devuan/files/90-murus-igneus.conf" "$stage/etc/sysctl.d/90-murus-igneus.conf"
 install -m 0644 "$root/LICENSE" "$stage/usr/share/doc/murus-igneus/LICENSE-GPL-3"
@@ -38,6 +40,7 @@ Priority: optional
 Architecture: all
 Maintainer: Murus Igneus contributors
 Depends: python3 (>= 3.11), nftables, iproute2, openssl, conntrack, kmod, wireguard-tools, strongswan-charon, strongswan-swanctl, libcharon-extra-plugins, libstrongswan-standard-plugins, iputils-ping, dpkg-repack, ca-certificates, tzdata, suricata, suricata-update, clamav, clamav-daemon, clamav-freshclam, python3-yaml, snmp, dnsmasq-base, udhcpc, rsync, fdisk, parted, dosfstools, e2fsprogs, grub-pc-bin, grub-efi-amd64-bin, grub2-common, openrc, init-system-helpers
+Suggests: qemu-guest-agent
 Description: Experimental IPv4 firewall management for Devuan 6 Excalibur
  Independent configuration editor and conservative configuration importer.
  Includes an OpenRC service. Includes VPN, IPS, HTTP antivirus, local AI connector and SNMP switch management.

@@ -1,0 +1,25 @@
+#!/sbin/openrc-run
+# SPDX-License-Identifier: MIT
+description="Murus Igneus QEMU Guest Agent"
+command="/usr/sbin/qemu-ga"
+channel="/dev/virtio-ports/org.qemu.guest_agent.0"
+command_args="--method=virtio-serial --path=$channel --allow-rpcs=guest-sync,guest-sync-delimited,guest-ping,guest-info,guest-get-host-name,guest-get-osinfo,guest-network-get-interfaces,guest-get-fsinfo,guest-shutdown"
+command_background="yes"
+pidfile="/run/murus-guest-agent.pid"
+
+depend() {
+    after udev bootmisc localmount
+}
+
+start() {
+    if [ ! -x "$command" ] || [ ! -c "$channel" ]; then
+        einfo "QEMU Guest Agent non avviato: pacchetto o canale VirtIO assente"
+        return 0
+    fi
+    default_start
+}
+
+stop() {
+    [ -e "$pidfile" ] || return 0
+    default_stop
+}

@@ -26,6 +26,8 @@ Validated alpha.11: 251 Python tests without skips, 24 Chromium checks, 51 packe
 
 Alpha.12 adds [optional key-only SSH management](docs/ADMIN-SSH.md) and separate [parental social schedules](docs/PARENTAL.md) that keep the adult filter active outside social blocking hours.
 
+Development adds a [Proxmox VM profile and QEMU Guest Agent](docs/PROXMOX.md) with VirtIO SCSI and I/O-thread acceptance.
+
 No Fortinet code, firmware or assets are reused.
 
 See [alpha.10 changes and limits](docs/ALPHA10.md), [parental setup and reporting](docs/PARENTAL.md), [alpha.10 ISO acceptance](docs/ISO-ALPHA10-QA.md), [previous feature setup/limits](docs/ALPHA5.md), [native networking](docs/NATIVE-NETWORKING.md), [AI and switches](docs/AI-SWITCHES.md), [Devuan build/install](docs/DEVUAN.md) and [source/verification status](SOURCE_STATUS.md).
