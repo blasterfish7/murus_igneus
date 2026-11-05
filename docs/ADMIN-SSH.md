@@ -1,6 +1,8 @@
 # Accesso SSH di amministrazione
 
-OpenSSH è incluso nella ISO di sviluppo e disabilitato di default. SSH si abilita su Murus installato su disco. Nella pagina **Amministrazione → Accesso SSH**, indica uno o più indirizzi o reti IPv4 autorizzati (preferisci il singolo PC con /32) e le chiavi pubbliche Ed25519. Se non hai già una chiave, sul PC di amministrazione esegui:
+**Italiano** · [English](ADMIN-SSH.en.md) · [Documentazione](INDEX.md)
+
+OpenSSH è incluso nella ISO alpha.12 e disabilitato di default. SSH si abilita su Murus installato su disco. Nella pagina **Amministrazione → Accesso SSH**, indica uno o più indirizzi o reti IPv4 autorizzati (preferisci il singolo PC con /32) e le chiavi pubbliche Ed25519. Se non hai già una chiave, sul PC di amministrazione esegui:
 
 ```sh
 ssh-keygen -t ed25519

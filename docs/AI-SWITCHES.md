@@ -1,5 +1,7 @@
 # Assistente AI e switch locali — alpha.3
 
+**Italiano** · [English](AI-SWITCHES.en.md) · [Documentazione](INDEX.md)
+
 La alpha.3 corregge la gestione delle richieste AI concorrenti e rifiuta proposte
 incomplete, comprese sezioni VPN/UTM parziali, prima che possano essere caricate
 nella bozza. Se un'altra sessione sostituisce il risultato, la GUI chiede di ripetere

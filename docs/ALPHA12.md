@@ -1,5 +1,7 @@
 # Murus Igneus 0.3.0-alpha.12
 
+**Italiano** · [English](ALPHA12.en.md) · [Documentazione](INDEX.md)
+
 Nuove funzioni: accesso SSH amministrativo facoltativo e fasce social indipendenti dai filtri permanenti.
 
 - **Nuova installazione:** avviare la ISO Devuan amd64 in UEFI. Accedere a `https://IP-DI-GESTIONE:8443` e seguire la procedura di installazione. La guida [alpha.11](https://github.com/blasterfish7/murus_igneus/blob/v0.3.0-alpha.11/docs/ALPHA11.md) descrive il primo accesso e l'installazione; l'installazione su disco cancella il disco selezionato dopo conferma esplicita.

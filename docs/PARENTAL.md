@@ -1,4 +1,6 @@
-# Parental control IPv4 — alpha.9
+# Parental control IPv4
+
+**Italiano** · [English](PARENTAL.en.md) · [Documentazione](INDEX.md)
 
 Il parental control filtra i domini e limita gli orari dei dispositivi il cui traffico passa da Murus. Non legge il contenuto HTTPS e non è un controllo completo delle applicazioni. Usare Murus come gateway dei dispositivi; una VM separata che non riceve il loro traffico non basta.
 
@@ -27,7 +29,7 @@ Categorie HaGeZi scaricabili da host e percorsi HTTPS prestabiliti:
 
 Fonte e licenza: https://github.com/hagezi/dns-blocklists — GPL-3.0. Il progetto distribuisce già la licenza GPL-3.0 in LICENSE. Le liste non sono incluse automaticamente nell’immagine: download volontario dall’interfaccia, massimo 16 MiB e 300.000 domini per lista, 600.000 domini complessivi per profilo. Il download controlla stato HTTP, formato, limiti e domini; una risposta HTML, vuota o con direttive viene rifiutata conservando la copia precedente. Sono registrati fonte, data e SHA256, non una firma crittografica del produttore. Gli aggiornamenti manuali richiedono Verifica e applica. Dalla alpha.9 è disponibile anche un aggiornamento automatico facoltativo con attivazione dei resolver, descritto sotto.
 
-I domini dei social sono un elenco locale ristretto: Instagram, TikTok, Facebook/Messenger, YouTube, Snapchat, Discord e Twitch. Le liste possono avere falsi positivi, omissioni e domini condivisi fra servizi. In particolare YouTube usa googlevideo.com: il blocco può coinvolgere servizi correlati.
+I domini dei social sono un elenco locale ristretto: Instagram, TikTok, Facebook/Messenger, YouTube, Snapchat, WhatsApp, Discord e Twitch. Le liste possono avere falsi positivi, omissioni e domini condivisi fra servizi. In particolare YouTube usa googlevideo.com: il blocco può coinvolgere servizi correlati.
 
 ## Limiti e dati
 

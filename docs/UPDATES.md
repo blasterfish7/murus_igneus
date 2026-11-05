@@ -1,5 +1,7 @@
 # Aggiornamenti applicativi firmati
 
+**Italiano** · [English](UPDATES.en.md) · [Documentazione](INDEX.md)
+
 La pagina **Sistema → Aggiornamenti** gestisce l’applicazione Murus Igneus su Devuan 6 Excalibur installato su disco. Non aggiorna Devuan, kernel, bootloader o firmware. In modalità live l’installazione degli aggiornamenti è disabilitata.
 
 ## Release e canali
@@ -26,7 +28,7 @@ La prima versione che introduce la pagina richiede un bootstrap manuale tramite 
 
 1. Caricare i tre file (DEB massimo 4 MiB; manifest massimo 4096 byte).
 2. Verificare versione, firma, digest e metadati.
-3. Riscrivere la conferma `AGGIORNA VERSIONE`.
+3. Digitare la conferma esatta mostrata, con `AGGIORNA` seguito dalla versione Debian.
 4. Attendere backup, installazione e ritorno del servizio HTTPS. Il traffico viene interrotto durante il riavvio.
 
 La verifica dura 30 minuti ed è sostituita da un successivo caricamento. Si installa la configurazione confermata, non la bozza del browser. Modifiche pendenti, altri lavori di manutenzione e operazioni switch/parental impediscono l’avvio. Durante aggiornamento/recupero sono bloccate le altre scritture API e il rinnovo automatico delle liste parental.
@@ -43,7 +45,7 @@ La nuova versione deve riavviare HTTPS e confermare localmente che l’avvio del
 
 ## Ripristino e interruzioni
 
-Il ripristino volontario recupera anche la configurazione del backup: le modifiche confermate dopo quel backup vanno perse. Richiede la conferma `RIPRISTINA VERSIONE`.
+Il ripristino volontario recupera anche la configurazione del backup: le modifiche confermate dopo quel backup vanno perse. Richiede la conferma esatta mostrata, con `RIPRISTINA` seguito dalla versione di destinazione.
 
 Se il processo viene interrotto, il registro viene rilevato come **Recupero necessario**. La pagina permette `RECUPERA SERVIZIO`: prima della prima scrittura DEB riavvia il servizio; dopo una scrittura del pacchetto ripristina lo snapshot preciso di quell’operazione. Se il web non riparte, usare la console:
 

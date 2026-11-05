@@ -1,5 +1,7 @@
 # Devuan 6 Excalibur / OpenRC
 
+[Italiano](DEVUAN.it.md) · **English** · [Documentation](INDEX.md)
+
 Murus Igneus 0.3.0-alpha now has a Debian-format package for an **existing Devuan
 6 Excalibur amd64 laboratory VM** and a fresh ISO builder with live web installer.
 See `SOURCE_STATUS.md` for current build and runtime verification status.
@@ -30,7 +32,7 @@ On a machine with Python 3 and `dpkg-deb`:
 sh packaging/devuan/build-deb.sh
 ```
 
-This creates `dist/murus-igneus_0.3.0~alpha.3_all.deb`. Building the package does
+This creates `dist/murus-igneus_*_all.deb`. Building the package does
 not require root, a chroot, network access, or changes to the host firewall.
 The payload preserves the MIT attribution of the recovered application code
 alongside the repository's GPL-3 license file. It includes no Alpine installer,
@@ -46,7 +48,7 @@ forwarding on that VM.
 
 ```sh
 sudo apt update
-sudo apt install ./dist/murus-igneus_0.3.0~alpha.3_all.deb
+sudo apt install ./dist/PACKAGE_NAME.deb
 ip -br address
 sudo editor /etc/default/murus-igneus
 ```
@@ -66,8 +68,9 @@ sudo /usr/sbin/murus-info
 ```
 
 Open `https://MANAGEMENT-IP:8443`. The initial web login is `admin` / `igneus`,
-matching the development branch's existing choice. An existing web password is
-preserved. The Devuan root password is never changed by this package.
+for a fresh ISO. See the [alpha.12 guide](ALPHA12.en.md) for mandatory
+first-login password setup and shared console/web credentials. Installing the DEB
+alone does not change the root password.
 TLS certificates and `/etc/murus_igneus/active.json` are generated/persisted on
 the installed filesystem. Logs are written to `/var/log/murus-igneus.log`.
 
@@ -111,7 +114,7 @@ Live-session changes are otherwise temporary.
 
 - WireGuard: server key stays on the appliance; enter client public keys and
   specific remote CIDRs. The synthetic VPN interface participates in policies.
-  IPsec and FortiGate VPN conversion are not included.
+  Native IKEv2/PSK is also available in current releases. Automatic FortiGate VPN conversion is not included.
 - Suricata: inline IPv4 forwarding inspection after policy filtering, NFQUEUE
   without bypass. If the engine stops, queued traffic is dropped. Two local HTTP
   signatures are included; download community rules for broader coverage.

@@ -1,4 +1,6 @@
-# Native networking — alpha.4
+# Native networking
+
+[Italiano](NATIVE-NETWORKING.it.md) · **English** · [Documentation](INDEX.md)
 
 This milestone adds independent native VLAN, DHCP/DNS, DNAT and connection views.
 It does not reuse Fortinet code, firmware or assets. The backup importer remains
@@ -24,13 +26,12 @@ and end must be inside its subnet and exclude network, broadcast and firewall
 address. The gateway advertised is the interface address. Specify up to four DNS
 server addresses, or leave them empty when local DNS is enabled on that interface.
 Do not enable a pool on a segment that already has an authoritative DHCP server.
-Reservations, relay, DHCPv6 and delegated prefixes are not implemented.
+Recent releases support MAC-based DHCP reservations. Relay, DHCPv6 and delegated prefixes are not implemented.
 
 DNS provides caching/forwarding and DHCP lease names with a local domain.
 Unresolved names within that domain are kept local rather than forwarded upstream. Select
 the data interfaces and up to eight explicit upstream IPv4 resolvers. There is no
-automatic `/etc/resolv.conf` fallback or `/etc/hosts` import. No DNSSEC or DNS
-category filtering is claimed. Forwarding to the firewall itself is rejected.
+automatic `/etc/resolv.conf` fallback or `/etc/hosts` import. No DNSSEC validation is claimed. Category filtering is a separate [parental-control feature](PARENTAL.en.md). Forwarding to the firewall itself is rejected.
 DNS input is allowed only from the selected interface subnet to its local IPv4;
 WAN and management receive no new DNS/DHCP firewall permission implicitly.
 
@@ -40,6 +41,12 @@ does not enable the distribution's separate dnsmasq service. The process is
 restarted inside the apply/rollback transaction. Lease storage is
 `/var/lib/murus-igneus/dnsmasq.leases`, copied during web installation; existing
 lease rows can outlive the pool configuration that created them.
+
+## DHCP WAN
+
+One data WAN can acquire IPv4 and its gateway through DHCP. Keep management separate.
+Received DNS addresses are displayed without replacing system DNS. Static routes
+and dual WAN require static ports. The default-route CIDR is `0.0.0.0/0` (alias `0.0.0.0`).
 
 ## Port forwarding
 
@@ -92,5 +99,4 @@ the resulting draft to the real backend compiler. Runtime health/traffic respons
 in that harness are controlled fixtures; actual packet acceptance is separate.
 The ISO job also boots the exact generated image with OVMF UEFI in QEMU TCG and
 executes the packet suite using the modules actually installed in that image.
-It verifies the real HTTPS backend and graceful poweroff; it does not test disk
-installation or physical hardware. Its JSON report includes the ISO SHA-256.
+It verifies the real HTTPS backend and graceful poweroff; recent releases also test disk installation and autonomous boot. It does not test physical hardware. Its JSON report includes the ISO SHA-256.
