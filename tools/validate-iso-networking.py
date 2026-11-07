@@ -37,7 +37,10 @@ with tempfile.TemporaryDirectory(prefix='murus-iso-qa-') as work:
     args = ['qemu-system-x86_64', '-machine', 'q35,accel=tcg', '-cpu', 'max', '-smp', '2', '-m', '2048',
             '-drive', 'if=pflash,format=raw,readonly=on,file=' + str(code), '-drive', 'if=pflash,format=raw,file=' + str(variables),
             '-display', 'none', '-serial', 'stdio', '-monitor', 'none', '-no-reboot', '-boot', 'd', '-cdrom', str(iso)]
-    args += ['-drive','file='+str(disk)+',if=virtio,format=raw']
+    args += ['-object','iothread,id=storage-io',
+             '-device','virtio-scsi-pci,id=storage-scsi,iothread=storage-io',
+             '-drive','file='+str(disk)+',if=none,id=storage-disk,format=raw',
+             '-device','scsi-hd,bus=storage-scsi.0,drive=storage-disk']
     for index in range(3):
         args += ['-netdev', f'user,id=n{index}'+(f',hostfwd=tcp:127.0.0.1:{web_port}-:8443,hostfwd=tcp:127.0.0.1:{ssh_port}-:22' if index==0 else ''), '-device', f'virtio-net-pci,netdev=n{index},romfile=']
     child = pexpect.spawn(args[0], args[1:], encoding='utf-8', timeout=360)
@@ -173,11 +176,13 @@ print('ISO_ROOT_PARENTAL_APPLY_ROLLBACK_OK')
             with remote.open(request,timeout=20) as response:return response.read()
         assert b'install-home' in web('')
         remote_csrf=json.loads(web('api/status'))['csrf']
-        inventory=json.loads(web('api/installer'));assert inventory['live'] and any(d['path']=='/dev/vda' for d in inventory['disks']),inventory
-        preview=json.loads(web('api/installer/preview',{'disk':'/dev/vda'}));assert preview['confirmation']=='CANCELLA /dev/vda',preview
+        inventory=json.loads(web('api/installer'));assert inventory['live'] and any(d['path']=='/dev/sda' for d in inventory['disks']),inventory
+        preview=json.loads(web('api/installer/preview',{'disk':'/dev/sda'}));assert preview['confirmation']=='CANCELLA /dev/sda',preview
         checks.append('Management HTTPS and live installer disk preview are reachable from outside the guest through the management NIC');print('PASS '+checks[-1],flush=True)
+        command('test -x /usr/sbin/qemu-ga && test ! -e /run/murus-guest-agent.pid')
+        checks.append('Live boot without a guest-agent channel leaves qemu-ga stopped')
         info=command('murus-info && murus-install --list')
-        assert 'https://' in info and ':8443' in info and '/dev/vda' in info and 'murus-install' in info,info
+        assert 'https://' in info and ':8443' in info and '/dev/sda' in info and 'murus-install' in info,info
         checks.append('Installed console helpers show real web URLs and list the blank installation disk without writing it');print('PASS '+checks[-1],flush=True)
         command('mkdir -p /tmp/murus-qa/tools /tmp/murus-qa/src && cp -a /usr/lib/murus-igneus /tmp/murus-qa/src/murus_igneus')
         status_payload=base64.b64encode(gzip.compress((ROOT/'tools/validate-status-runtime.py').read_bytes())).decode()
@@ -225,17 +230,21 @@ print('ISO_ROOT_PARENTAL_APPLY_ROLLBACK_OK')
         checks += ['Devuan ISO: '+item for item in dhcp_report['checks']]
         print('PASS DHCP WAN and anti-lockout suite on original ISO: 6 checks',flush=True)
         # Install only onto the fresh sparse disk created by this disposable QEMU fixture.
-        child.sendline("murus-install --disk /dev/vda; printf '\\n__MIQA_INSTALL_END__:%s\\n' \"$?\"")
+        child.sendline("murus-install --disk /dev/sda; printf '\\n__MIQA_INSTALL_END__:%s\\n' \"$?\"")
         child.expect(r'Conferma \(Invio per annullare\): ',timeout=30)
-        child.sendline('CANCELLA /dev/vda')
+        child.sendline('CANCELLA /dev/sda')
         child.expect(r'\r*\n__MIQA_INSTALL_END__:(\d+)\r*\n',timeout=900)
         install_output=child.before;status=int(child.match.group(1));child.expect(prompt)
         assert status==0 and 'INSTALLAZIONE COMPLETATA' in install_output,install_output[-6000:]
-        checks.append('Console installer explicitly confirms and installs onto the disposable 16 GiB virtual disk');print('PASS '+checks[-1],flush=True)
+        checks.append('Console installer explicitly confirms and installs onto the disposable 16 GiB VirtIO SCSI disk with an I/O thread');print('PASS '+checks[-1],flush=True)
         child.sendline('poweroff'); child.expect(pexpect.EOF, timeout=300)
         checks.append('Graceful live VM poweroff'); print('PASS ' + checks[-1], flush=True)
         child.close()
         disk_args=args.copy();cd=disk_args.index('-cdrom');del disk_args[cd:cd+2];disk_args[disk_args.index('-boot')+1]='c'
+        agent_socket = Path(work)/'qga.sock'
+        disk_args += ['-device','virtio-serial-pci',
+                      '-chardev',f'socket,path={agent_socket},server=on,wait=off,id=guest-agent',
+                      '-device','virtserialport,chardev=guest-agent,name=org.qemu.guest_agent.0']
         child=pexpect.spawn(disk_args[0],disk_args[1:],encoding='utf-8',timeout=360);child.logfile=log
         child.expect(r'login:');child.sendline('root');child.expect('Password:');child.sendline(QA_PASSWORD);child.expect(r'root@[^\r\n]*[#$] ')
         child.sendline("export PS1='MIQA# '");child.expect(prompt)
@@ -249,6 +258,36 @@ print('ISO_ROOT_PARENTAL_APPLY_ROLLBACK_OK')
         else:raise AssertionError('Installed disk HTTPS unavailable')
         assert json.loads(web('api/installer'))['live'] is False
         checks.append('Installed disk boots independently with the ISO detached and serves management HTTPS through the NIC');print('PASS '+checks[-1],flush=True)
+        def agent(execute, arguments=None, reply=True):
+            message = {'execute':execute}
+            if arguments is not None:
+                message['arguments'] = arguments
+            with socket.socket(socket.AF_UNIX) as channel:
+                channel.settimeout(5)
+                channel.connect(str(agent_socket))
+                channel.sendall(json.dumps(message).encode() + b'\n')
+                if not reply:
+                    return None
+                with channel.makefile('rb') as stream:
+                    result = json.loads(stream.readline())
+                assert 'return' in result, result
+                return result['return']
+        for attempt in range(12):
+            try:
+                assert agent('guest-ping') == {}
+                break
+            except (OSError, ValueError):
+                time.sleep(1)
+        else:
+            raise AssertionError('Installed QEMU Guest Agent did not answer ping')
+        guest_nics = agent('guest-network-get-interfaces')
+        assert {'eth0','eth1','eth2'} <= {row['name'] for row in guest_nics}, guest_nics
+        assert any(a['ip-address-type']=='ipv4' for row in guest_nics if row['name']=='eth0'
+                   for a in row.get('ip-addresses', [])), guest_nics
+        commands = {row['name']:row['enabled'] for row in agent('guest-info')['supported_commands']}
+        assert commands.get('guest-shutdown') and not commands.get('guest-exec') and not commands.get('guest-fsfreeze-freeze')
+        checks.append('Installed QEMU Guest Agent answers ping and reports management IPv4 via VirtIO; exec and freeze disabled')
+        print('PASS '+checks[-1],flush=True)
         key = Path(work)/'qa-ssh'
         wrong_key = Path(work)/'qa-ssh-wrong'
         for path in (key, wrong_key):
@@ -301,11 +340,12 @@ print('ISO_ROOT_PARENTAL_APPLY_ROLLBACK_OK')
         assert update_report['success'] and len(update_report['checks'])==6,update_report
         for item in update_report['checks']:
             checks.append('Installed update: '+item);print('PASS '+checks[-1],flush=True)
-        child.sendline('poweroff');child.expect(pexpect.EOF,timeout=300)
-        checks.append('Graceful installed VM poweroff');print('PASS '+checks[-1],flush=True)
+        agent('guest-shutdown',{'mode':'powerdown'},reply=False)
+        child.expect(pexpect.EOF,timeout=300)
+        checks.append('Graceful installed VM poweroff via QEMU Guest Agent');print('PASS '+checks[-1],flush=True)
         with iso.open('rb') as file:
             digest = hashlib.file_digest(file, 'sha256').hexdigest()
-        result = {'success': True, 'checks': checks, 'iso': iso.name, 'sha256': digest, 'scope': 'QEMU TCG UEFI live boot; installed product modules exercised with real packets inside isolated guest namespaces. Explicit console installation on a fresh 16 GiB virtual disk and autonomous UEFI disk boot with management HTTPS verified. No BIOS, Secure Boot or physical hardware test.'}
+        result = {'success': True, 'checks': checks, 'iso': iso.name, 'sha256': digest, 'scope': 'QEMU TCG UEFI live boot; installed product modules exercised with real packets inside isolated guest namespaces. Explicit console installation on a fresh 16 GiB VirtIO SCSI disk with an I/O thread and autonomous UEFI disk boot with management HTTPS verified. No BIOS, Secure Boot or physical hardware test.'}
         (ROOT / 'dist/alpha12-iso-networking-qa.json').write_text(json.dumps(result, indent=2) + '\n')
     finally:
         if child.isalive():
